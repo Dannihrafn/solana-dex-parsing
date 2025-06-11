@@ -3,7 +3,7 @@ use types::{MyTransaction, PumpAmmTransaction, StructuredInstruction, Transactio
 use utils::{get_account_keys, get_filtered_instructions};
 
 #[derive(Debug)]
-struct DecodedPumpAmmBuyLog {
+pub struct DecodedPumpAmmBuyLog {
     quote_amount_in: u64,
     base_amount_out: u64,
     pool_base_token_reserves: u64,
@@ -12,7 +12,7 @@ struct DecodedPumpAmmBuyLog {
 }
 
 #[derive(Debug)]
-struct DecodedPumpAmmSellLog {
+pub struct DecodedPumpAmmSellLog {
     base_amount_in: u64,
     pool_base_token_reserves: u64,
     pool_quote_token_reserves: u64,
@@ -20,9 +20,23 @@ struct DecodedPumpAmmSellLog {
     coin_creator: String,
 }
 #[derive(Debug)]
+pub struct DecodedCreatePoolEvent {
+    pool: String,
+    creator: String,
+    base_mint: String,
+    quote_mint: String,
+    pool_base_token_reserve: u64,
+    pool_quote_token_reserve: u64,
+    pool_base_token_account: String,
+    pool_quote_token_account: String,
+    index: u16,
+    event_type: TransactionType,
+}
+
+#[derive(Debug)]
 pub enum DecodedEvent {
     Swap(DecodedSwapEvent),
-    //CreatePool(DecodedCreatePoolEvent),
+    CreatePool(DecodedCreatePoolEvent),
     //Withdraw(DecodedWithdrawEvent),
     //Deposit(DecodedDepositEvent),
 }
@@ -36,7 +50,7 @@ struct SwapEventAccounts {
 }
 
 #[derive(Debug)]
-struct DecodedSwapEvent {
+pub struct DecodedSwapEvent {
     accounts: SwapEventAccounts,
     mint_in: String,
     mint_out: String,
@@ -218,8 +232,37 @@ impl PumpAmmInstructionParser {
     pub fn decode_pool_creation_event(
         instruction: &StructuredInstruction,
         account_keys: &Vec<String>,
-    ) -> Option<PumpAmmTransaction> {
-        todo!();
+    ) -> DecodedCreatePoolEvent {
+        let account_key_indexes: &Vec<u8> = &instruction.account_key_indexes;
+        let data: &Vec<u8> = &instruction.data;
+        let pool: String = account_keys[account_key_indexes[0] as usize].clone();
+        let base_mint: String = account_keys[account_key_indexes[3] as usize].clone();
+        let quote_mint: String = account_keys[account_key_indexes[4] as usize].clone();
+        let pool_base_token_account: String = account_keys[account_key_indexes[9] as usize].clone();
+        let pool_quote_token_account: String =
+            account_keys[account_key_indexes[10] as usize].clone();
+
+        let mut offset: usize = 8;
+        let index: u16 = u16::from_le_bytes(data[offset..offset + 2].try_into().unwrap());
+        offset += 2;
+        let base_amount_in: u64 = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let quote_amount_in: u64 = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let coin_creator: String = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
+
+        DecodedCreatePoolEvent {
+            pool,
+            creator: coin_creator,
+            base_mint,
+            quote_mint,
+            pool_base_token_reserve: base_amount_in,
+            pool_quote_token_reserve: quote_amount_in,
+            pool_base_token_account,
+            pool_quote_token_account,
+            index,
+            event_type: TransactionType::CreatePool,
+        }
     }
 
     pub fn decode_withdraw_event(
