@@ -19,8 +19,10 @@ edition = "2024"
 serde = { version = "1.0.197", features = ["derive"]}
 types = { workspace = true }
 utils = { workspace = true }
+parser-pump-amm = { workspace = true }
 
 [workspace.dependencies]
 types = { path = "crates/types" }
 parser-core = { path = "crates/parser-core" }
 utils = { path = "crates/utils" }
+parser-pump-amm = { path = "crates/parser-pump-amm" }

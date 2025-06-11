@@ -38,96 +38,107 @@ pub fn get_filtered_instructions(
 }
 
 pub fn structure_all_instructions(transaction: &MyTransaction) -> Vec<StructuredInstruction> {
-    let max_depth = 3;
-    let compiled_instructions = &transaction.transaction.message.instructions;
-    let inner_instructions = &transaction.meta.inner_instructions;
+    let max_depth: usize = 3;
+    let compiled_instructions: &Vec<MyCompiledInstruction> =
+        &transaction.transaction.message.instructions;
+    let inner_instructions: &Vec<MyInnerInstructions> = &transaction.meta.inner_instructions;
 
     if inner_instructions.is_empty() {
         return compiled_instructions
             .iter()
-            .map(|instruction| {
-                return StructuredInstruction {
+            .map(
+                |instruction: &MyCompiledInstruction| StructuredInstruction {
                     account_key_indexes: instruction.accounts.clone(),
-                    program_id_index: instruction.program_id_index.clone() as u8,
+                    program_id_index: instruction.program_id_index as u8,
                     data: instruction.data.clone(),
                     inner_instructions: Vec::new(),
-                };
-            })
+                },
+            )
             .collect();
     }
 
     let mut formatted: Vec<StructuredInstruction> = Vec::new();
 
-    inner_instructions.iter().for_each(|instruction| {
-        let parent_ix = &compiled_instructions[instruction.index as usize];
-        let mut parent: StructuredInstruction = StructuredInstruction {
+    for inner_instruction_group in inner_instructions.iter() {
+        let parent_ix: &MyCompiledInstruction =
+            &compiled_instructions[inner_instruction_group.index as usize];
+
+        let mut parent = StructuredInstruction {
             account_key_indexes: parent_ix.accounts.clone(),
-            program_id_index: parent_ix.program_id_index.clone() as u8,
+            program_id_index: parent_ix.program_id_index as u8,
             data: parent_ix.data.clone(),
             inner_instructions: Vec::new(),
         };
+
+        // Working tree of depth-0 children
         let mut tree: Vec<InnerInstruction> = Vec::new();
-        let mut stack: Vec<StructuredInstruction> = Vec::new();
-        let mut promoted: HashSet<StructuredInstruction> = HashSet::new();
+        // Stack to track most recent instruction at each depth
+        let mut stack: Vec<Option<InnerInstruction>> = Vec::new();
+        // Track promoted instructions to avoid duplicates
+        let mut promoted: HashSet<usize> = HashSet::new(); // Using index instead of the struct
 
-        instruction
-            .instructions
-            .iter()
-            .for_each(|inner_instruction| {
-                let depth: u8 = inner_instruction
-                    .stack_height
-                    .unwrap_or(0)
-                    .try_into()
-                    .unwrap();
-                let mut new_ix: StructuredInstruction = StructuredInstruction {
-                    account_key_indexes: inner_instruction.accounts.clone(),
-                    program_id_index: inner_instruction.program_id_index.clone() as u8,
-                    data: inner_instruction.data.clone(),
-                    inner_instructions: Vec::new(),
-                };
+        for (ins_index, inner_instruction) in
+            inner_instruction_group.instructions.iter().enumerate()
+        {
+            let depth: usize = inner_instruction
+                .stack_height
+                .unwrap_or(0)
+                .try_into()
+                .unwrap_or(0);
 
-                if depth == 0 {
-                    tree.push(InnerInstruction {
-                        accounts: new_ix.account_key_indexes.clone(),
-                        data: new_ix.data.clone(),
-                        program_id_index: new_ix.program_id_index.clone(),
-                        stack_height: depth,
-                        inner_instructions: Vec::new(),
-                    });
-                } else {
-                    if depth > max_depth {
-                        let prev = &stack[max_depth as usize];
-                        if !promoted.contains(&prev) {
-                            tree.push(InnerInstruction {
-                                accounts: prev.account_key_indexes.clone(),
-                                data: prev.data.clone(),
-                                program_id_index: prev.program_id_index.clone(),
-                                stack_height: depth,
-                                inner_instructions: Vec::new(),
-                            });
-                            promoted.insert(prev.clone());
+            let mut new_instruction = InnerInstruction {
+                accounts: inner_instruction.accounts.clone(),
+                data: inner_instruction.data.clone(),
+                program_id_index: inner_instruction.program_id_index as u8,
+                stack_height: depth as u8,
+                inner_instructions: Vec::new(),
+            };
+
+            // Ensure stack is large enough
+            while stack.len() <= depth {
+                stack.push(None);
+            }
+
+            if depth == 0 {
+                // True top-level under this parent
+                tree.push(new_instruction.clone());
+            } else {
+                // Handle depth > maxDepth by promoting
+                if depth > max_depth {
+                    if let Some(Some(prev)) = stack.get(max_depth) {
+                        if !promoted.contains(&max_depth) {
+                            tree.push(prev.clone());
+                            promoted.insert(max_depth);
                         }
                     }
-
-                    let parent_depth = if depth > max_depth {
-                        max_depth
-                    } else {
-                        depth - 1
-                    };
-                    let mut p = stack[parent_depth as usize].clone();
-                    p.inner_instructions.push(InnerInstruction {
-                        accounts: new_ix.account_key_indexes.clone(),
-                        data: new_ix.data.clone(),
-                        program_id_index: new_ix.program_id_index.clone(),
-                        stack_height: depth,
-                        inner_instructions: Vec::new(),
-                    });
                 }
-                stack[depth as usize] = new_ix.clone();
-            });
-        parent.inner_instructions = tree.clone();
-        formatted.push(parent.clone());
-    });
+
+                // Pick the right parent in the stack
+                let parent_depth = if depth > max_depth {
+                    max_depth
+                } else {
+                    depth - 1
+                };
+
+                if let Some(Some(parent_in_stack)) = stack.get_mut(parent_depth) {
+                    parent_in_stack
+                        .inner_instructions
+                        .push(new_instruction.clone());
+                } else {
+                    // Fallback if stack was missing
+                    tree.push(new_instruction.clone());
+                }
+            }
+
+            // Update stack at current depth
+            stack[depth] = Some(new_instruction);
+        }
+
+        // Attach the assembled tree to parent
+        parent.inner_instructions = tree;
+        formatted.push(parent);
+    }
+
     formatted
 }
 

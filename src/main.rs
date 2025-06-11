@@ -3,6 +3,7 @@ use types::{
     MyTokenBalance, MyTransaction, MyTransactionInner, MyUiTokenAmount,
 };
 
+use parser_pump_amm::PumpAmmInstructionParser;
 use utils::{get_account_keys, structure_all_instructions};
 
 fn main() {
@@ -596,6 +597,7 @@ fn main() {
         },
     };
 
-    let x = structure_all_instructions(&transaction);
-    println!("{:?}", x);
+    let parser = PumpAmmInstructionParser::new();
+    let decoded_tx = parser.decode_transaction(&transaction);
+    println!("{:?}", decoded_tx);
 }
