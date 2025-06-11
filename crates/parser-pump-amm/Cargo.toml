@@ -1,9 +1,9 @@
 [package]
-name = "utils"
+name = "parser-pump-amm"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { version = "1.0.197", features = ["derive"]}
+parser-core = { workspace = true }
 types = { workspace = true }
-bs58 = "0.5.1"
+utils = { workspace = true }

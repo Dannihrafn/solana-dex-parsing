@@ -1,3 +1,15 @@
+[workspace]
+members = [
+    "crates/types",
+    "crates/utils",
+    "crates/proto-gen",
+    "crates/parser-core",
+    "crates/parser-pump-amm",
+    "crates/parser-pumpfun",
+    "crates/parser-raydium",
+    "crates/grpc-server",
+]
+
 [package]
 name = "actual-rust-parser"
 version = "0.1.0"
@@ -5,3 +17,10 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0.197", features = ["derive"]}
+types = { workspace = true }
+utils = { workspace = true }
+
+[workspace.dependencies]
+types = { path = "crates/types" }
+parser-core = { path = "crates/parser-core" }
+utils = { path = "crates/utils" }
