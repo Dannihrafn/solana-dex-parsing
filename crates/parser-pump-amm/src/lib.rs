@@ -109,9 +109,12 @@ impl PumpAmmInstructionParser {
                 instruction,
                 account_keys,
             )));
-        } /*else if discriminator == Self::POOL_CREATION_DISCRIMINATOR {
-        return Self::decode_pool_creation_event(instruction, account_keys);
-        } else if discriminator == Self::WITHDRAW_DISCRIMINATOR {
+        } else if discriminator == Self::POOL_CREATION_DISCRIMINATOR {
+            return Some(DecodedEvent::CreatePool(Self::decode_pool_creation_event(
+                instruction,
+                account_keys,
+            )));
+        } /*else if discriminator == Self::WITHDRAW_DISCRIMINATOR {
         return Self::decode_withdraw_event(instruction, account_keys);
         } else if discriminator == Self::DEPOSIT_DISCRIMINATOR {
         return Self::decode_deposit_event(instruction, account_keys);
