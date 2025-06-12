@@ -1,5 +1,5 @@
 use bs58;
-use types::{MyTransaction, PumpAmmTransaction, StructuredInstruction, TransactionType};
+use types::{PumpAmmTransaction, StructuredInstruction, TransactionType};
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 

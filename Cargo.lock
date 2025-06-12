@@ -2381,7 +2381,6 @@ name = "parser-pump-amm"
 version = "0.1.0"
 dependencies = [
  "bs58",
- "parser-core",
  "types",
  "utils",
  "yellowstone-grpc-proto",
@@ -2392,7 +2391,6 @@ name = "parser-pumpfun"
 version = "0.1.0"
 dependencies = [
  "bs58",
- "parser-core",
  "types",
  "utils",
  "yellowstone-grpc-proto",
@@ -5103,7 +5101,6 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "bs58",
- "serde",
  "types",
  "yellowstone-grpc-proto",
 ]

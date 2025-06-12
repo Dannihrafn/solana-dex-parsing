@@ -1,8 +1,7 @@
 use bs58;
 use std::collections::HashSet;
 use types::{
-    InnerInstruction, MyCompiledInstruction, MyInnerInstructions,
-    MyTransaction, StructuredInstruction,
+    InnerInstruction, StructuredInstruction,
 };
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
