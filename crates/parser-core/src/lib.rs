@@ -1,5 +1,11 @@
 use types::{MyTransaction, TransactionEvent};
+use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
-pub trait TransactionParser {
-    fn parse_transaction(transaction: MyTransaction) -> Vec<TransactionEvent>;
+pub enum ParsedTransaction {
+    PumpAmm(ParsedPumpAmmTransaction),
+    PumpFun(ParsedPumpFunTransaction)
+}
+
+pub trait TransactionParserNew {
+    fn parse_transaction(&self, transaction: SubscribeUpdateTransaction) -> Vec<ParsedTransaction>;
 }

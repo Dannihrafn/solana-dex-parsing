@@ -20,7 +20,7 @@ pub struct DecodedPumpAmmSellLog {
     coin_creator: String,
 }
 #[derive(Debug)]
-pub struct DecodedCreatePoolEvent {
+pub struct DecodedPumpAmmCreatePoolEvent {
     pool: String,
     creator: String,
     base_mint: String,
@@ -34,9 +34,9 @@ pub struct DecodedCreatePoolEvent {
 }
 
 #[derive(Debug)]
-pub enum DecodedEvent {
-    Swap(DecodedSwapEvent),
-    CreatePool(DecodedCreatePoolEvent),
+pub enum DecodedPumpAmmEvent {
+    Swap(DecodedPumpAmmSwapEvent),
+    CreatePool(DecodedPumpAmmCreatePoolEvent),
     //Withdraw(DecodedWithdrawEvent),
     //Deposit(DecodedDepositEvent),
 }
@@ -50,7 +50,7 @@ struct SwapEventAccounts {
 }
 
 #[derive(Debug)]
-pub struct DecodedSwapEvent {
+pub struct DecodedPumpAmmSwapEvent {
     accounts: SwapEventAccounts,
     mint_in: String,
     mint_out: String,
@@ -79,14 +79,14 @@ impl PumpAmmInstructionParser {
         Self::PROGRAM_ID
     }
 
-    pub fn decode_transaction(&self, transaction: &MyTransaction) -> Vec<DecodedEvent> {
+    pub fn decode_transaction(&self, transaction: &MyTransaction) -> Vec<DecodedPumpAmmEvent> {
         let account_keys: Vec<String> = get_account_keys(transaction);
         let ixs: Vec<StructuredInstruction> =
             get_filtered_instructions(&account_keys, transaction, self.get_program_id());
         if ixs.is_empty() {
             return Vec::new();
         }
-        let decoded_instructions: Vec<DecodedEvent> = ixs
+        let decoded_instructions: Vec<DecodedPumpAmmEvent> = ixs
             .iter()
             .filter_map(|instruction| self.decode_instruction(instruction, &account_keys))
             .collect();
@@ -97,20 +97,20 @@ impl PumpAmmInstructionParser {
         &self,
         instruction: &StructuredInstruction,
         account_keys: &Vec<String>,
-    ) -> Option<DecodedEvent> {
+    ) -> Option<DecodedPumpAmmEvent> {
         let discriminator = &instruction.data[..8];
         if discriminator == Self::BUY_DISCRIMINATOR {
-            return Some(DecodedEvent::Swap(Self::decode_buy_event(
+            return Some(DecodedPumpAmmEvent::Swap(Self::decode_buy_event(
                 instruction,
                 account_keys,
             )));
         } else if discriminator == Self::SELL_DISCRIMINATOR {
-            return Some(DecodedEvent::Swap(Self::decode_sell_event(
+            return Some(DecodedPumpAmmEvent::Swap(Self::decode_sell_event(
                 instruction,
                 account_keys,
             )));
         } else if discriminator == Self::POOL_CREATION_DISCRIMINATOR {
-            return Some(DecodedEvent::CreatePool(Self::decode_pool_creation_event(
+            return Some(DecodedPumpAmmEvent::CreatePool(Self::decode_pool_creation_event(
                 instruction,
                 account_keys,
             )));
@@ -125,7 +125,7 @@ impl PumpAmmInstructionParser {
     pub fn decode_buy_event(
         instruction: &StructuredInstruction,
         account_keys: &[String],
-    ) -> DecodedSwapEvent {
+    ) -> DecodedPumpAmmSwapEvent {
         let account_key_indexes = &instruction.account_key_indexes;
         let pool = account_keys[account_key_indexes[0] as usize].clone();
         let user = account_keys[account_key_indexes[1] as usize].clone();
@@ -136,7 +136,7 @@ impl PumpAmmInstructionParser {
         let mint_in_reserve = decoded_buy_log.pool_base_token_reserves.clone();
         let mint_out_reserve = decoded_buy_log.pool_quote_token_reserves.clone();
 
-        DecodedSwapEvent {
+        DecodedPumpAmmSwapEvent {
             accounts: SwapEventAccounts {
                 pool,
                 user,
@@ -181,7 +181,7 @@ impl PumpAmmInstructionParser {
     pub fn decode_sell_event(
         instruction: &StructuredInstruction,
         account_keys: &Vec<String>,
-    ) -> DecodedSwapEvent {
+    ) -> DecodedPumpAmmSwapEvent {
         let account_key_indexes = &instruction.account_key_indexes;
         let pool = account_keys[account_key_indexes[0] as usize].clone();
         let user = account_keys[account_key_indexes[1] as usize].clone();
@@ -192,7 +192,7 @@ impl PumpAmmInstructionParser {
         let mint_in_reserve = decoded_sell_log.pool_base_token_reserves.clone();
         let mint_out_reserve = decoded_sell_log.pool_quote_token_reserves.clone();
 
-        DecodedSwapEvent {
+        DecodedPumpAmmSwapEvent {
             accounts: SwapEventAccounts {
                 pool,
                 user,
@@ -235,7 +235,7 @@ impl PumpAmmInstructionParser {
     pub fn decode_pool_creation_event(
         instruction: &StructuredInstruction,
         account_keys: &Vec<String>,
-    ) -> DecodedCreatePoolEvent {
+    ) -> DecodedPumpAmmCreatePoolEvent {
         let account_key_indexes: &Vec<u8> = &instruction.account_key_indexes;
         let data: &Vec<u8> = &instruction.data;
         let pool: String = account_keys[account_key_indexes[0] as usize].clone();
@@ -254,7 +254,7 @@ impl PumpAmmInstructionParser {
         offset += 8;
         let coin_creator: String = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
 
-        DecodedCreatePoolEvent {
+        DecodedPumpAmmCreatePoolEvent {
             pool,
             creator: coin_creator,
             base_mint,
