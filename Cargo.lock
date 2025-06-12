@@ -343,6 +343,12 @@ dependencies = [
 [[package]]
 name = "parser-pumpfun"
 version = "0.1.0"
+dependencies = [
+ "bs58",
+ "parser-core",
+ "types",
+ "utils",
+]
 
 [[package]]
 name = "parser-raydium"
