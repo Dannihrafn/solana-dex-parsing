@@ -1,17 +1,10 @@
 use bs58;
 use std::collections::HashSet;
 use types::{
-    InnerInstruction, MyCompiledInstruction, MyHeader, MyInnerInstruction, MyInnerInstructions,
-    MyMessage, MyMeta, MyTokenBalance, MyTransaction, MyTransactionInner, MyUiTokenAmount,
-    StructuredInstruction,
+    InnerInstruction, MyCompiledInstruction, MyInnerInstructions,
+    MyTransaction, StructuredInstruction,
 };
-use yellowstone_grpc_proto::{
-    geyser::SubscribeRequestFilterTransactions,
-    prelude::{
-        CommitmentLevel, SubscribeRequest, SubscribeRequestPing, SubscribeUpdateTransaction,
-        subscribe_update::UpdateOneof,
-    },
-};
+use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
 pub fn get_account_keys(transaction: &MyTransaction) -> Vec<String> {
     let static_account_keys = &transaction.transaction.message.account_keys;
@@ -95,7 +88,7 @@ pub fn structure_all_instructions_new(transaction: &SubscribeUpdateTransaction) 
         // Track promoted instructions to avoid duplicates
         let mut promoted: HashSet<usize> = HashSet::new(); // Using index instead of the struct
 
-        for (ins_index, inner_instruction) in
+        for (_, inner_instruction) in
             inner_instruction_group.instructions.iter().enumerate()
         {
             let depth: usize = inner_instruction
@@ -218,7 +211,7 @@ pub fn structure_all_instructions(transaction: &MyTransaction) -> Vec<Structured
         // Track promoted instructions to avoid duplicates
         let mut promoted: HashSet<usize> = HashSet::new(); // Using index instead of the struct
 
-        for (ins_index, inner_instruction) in
+        for (_, inner_instruction) in
             inner_instruction_group.instructions.iter().enumerate()
         {
             let depth: usize = inner_instruction
