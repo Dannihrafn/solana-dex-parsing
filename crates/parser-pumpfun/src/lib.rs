@@ -238,7 +238,6 @@ impl PumpAmmInstructionParser {
         let mint = bs58::encode(account_keys[account_key_indexes[0] as usize].clone()).into_string();
         let bonding_curve = bs58::encode(account_keys[account_key_indexes[2] as usize].clone()).into_string();
         let associated_bonding_curve = bs58::encode(account_keys[account_key_indexes[3] as usize].clone()).into_string();
-        let user = bs58::encode(account_keys[account_key_indexes[7] as usize].clone()).into_string();
 
         DecodedPumpFunCreatePoolEvent {
             name,
