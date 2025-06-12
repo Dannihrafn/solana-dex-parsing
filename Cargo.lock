@@ -2372,6 +2372,7 @@ name = "parser-core"
 version = "0.1.0"
 dependencies = [
  "types",
+ "utils",
  "yellowstone-grpc-proto",
 ]
 
@@ -2383,6 +2384,7 @@ dependencies = [
  "parser-core",
  "types",
  "utils",
+ "yellowstone-grpc-proto",
 ]
 
 [[package]]
@@ -2393,6 +2395,7 @@ dependencies = [
  "parser-core",
  "types",
  "utils",
+ "yellowstone-grpc-proto",
 ]
 
 [[package]]

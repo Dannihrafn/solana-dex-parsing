@@ -1,6 +1,7 @@
 use bs58;
 use types::{MyTransaction, PumpAmmTransaction, StructuredInstruction, TransactionType};
 use utils::{get_account_keys, get_filtered_instructions};
+use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
 #[derive(Debug)]
 pub struct DecodedPumpAmmBuyLog {
@@ -79,10 +80,10 @@ impl PumpAmmInstructionParser {
         Self::PROGRAM_ID
     }
 
-    pub fn decode_transaction(&self, transaction: &MyTransaction) -> Vec<DecodedPumpAmmEvent> {
+    pub fn decode_transaction(&self, transaction: &SubscribeUpdateTransaction) -> Vec<DecodedPumpAmmEvent> {
         let account_keys: Vec<String> = get_account_keys(transaction);
         let ixs: Vec<StructuredInstruction> =
-            get_filtered_instructions(&account_keys, transaction, self.get_program_id());
+            get_filtered_instructions(transaction, &account_keys, self.get_program_id());
         if ixs.is_empty() {
             return Vec::new();
         }

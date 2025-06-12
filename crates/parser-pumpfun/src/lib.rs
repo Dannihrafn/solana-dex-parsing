@@ -1,7 +1,7 @@
 use bs58;
 use types::{MyTransaction, StructuredInstruction, TransactionType};
 use utils::{get_account_keys, get_filtered_instructions};
-
+use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 #[derive(Debug)]
 pub struct DecodedPumpFunSwapLog {
     mint: String,
@@ -34,8 +34,8 @@ pub struct DecodedPumpFunCreatePoolEvent {
 }
 
 #[derive(Debug)]
-pub enum DecodedEvent {
-    Swap(DecodedSwapEvent),
+pub enum DecodedPumpFunEvent {
+    Swap(DecodedPumpFunSwapEvent),
     CreatePool(DecodedPumpFunCreatePoolEvent),
     //Withdraw(DecodedWithdrawEvent),
     //Deposit(DecodedDepositEvent),
@@ -50,7 +50,7 @@ struct SwapEventAccounts {
 }
 
 #[derive(Debug)]
-pub struct DecodedSwapEvent {
+pub struct DecodedPumpFunSwapEvent {
     accounts: SwapEventAccounts,
     mint_in: String,
     mint_out: String,
@@ -80,14 +80,14 @@ impl PumpAmmInstructionParser {
         Self::PROGRAM_ID
     }
 
-    pub fn decode_transaction(&self, transaction: &MyTransaction) -> Vec<DecodedEvent> {
+    pub fn decode_transaction(&self, transaction: &SubscribeUpdateTransaction) -> Vec<DecodedPumpFunEvent> {
         let account_keys: Vec<String> = get_account_keys(transaction);
         let ixs: Vec<StructuredInstruction> =
-            get_filtered_instructions(&account_keys, transaction, self.get_program_id());
+            get_filtered_instructions(transaction, &account_keys, self.get_program_id());
         if ixs.is_empty() {
             return Vec::new();
         }
-        let decoded_instructions: Vec<DecodedEvent> = ixs
+        let decoded_instructions: Vec<DecodedPumpFunEvent> = ixs
             .iter()
             .filter_map(|instruction| self.decode_instruction(instruction, &account_keys))
             .collect();
@@ -98,18 +98,18 @@ impl PumpAmmInstructionParser {
         &self,
         instruction: &StructuredInstruction,
         account_keys: &Vec<String>,
-    ) -> Option<DecodedEvent> {
+    ) -> Option<DecodedPumpFunEvent> {
         let discriminator = &instruction.data[..8];
         if discriminator == Self::BUY_DISCRIMINATOR {
-            return Some(DecodedEvent::Swap(Self::decode_buy_event(
+            return Some(DecodedPumpFunEvent::Swap(Self::decode_buy_event(
                 instruction,
             )));
         } else if discriminator == Self::SELL_DISCRIMINATOR {
-            return Some(DecodedEvent::Swap(Self::decode_sell_event(
+            return Some(DecodedPumpFunEvent::Swap(Self::decode_sell_event(
                 instruction,
             )));
         } else if discriminator == Self::POOL_CREATION_DISCRIMINATOR {
-            return Some(DecodedEvent::CreatePool(Self::decode_pool_creation_event(
+            return Some(DecodedPumpFunEvent::CreatePool(Self::decode_pool_creation_event(
                 instruction,
                 account_keys,
             )));
@@ -119,12 +119,12 @@ impl PumpAmmInstructionParser {
 
     pub fn decode_buy_event(
         instruction: &StructuredInstruction,
-    ) -> DecodedSwapEvent {
+    ) -> DecodedPumpFunSwapEvent {
         let last_ix = instruction.inner_instructions.last().unwrap();
         let buy_log = if last_ix.data.len() < 233 {instruction.inner_instructions.get(instruction.inner_instructions.len().wrapping_sub(2)).unwrap()} else {last_ix};
         let decoded_buy_log = Self::decode_buy_log(&buy_log.data);
 
-        DecodedSwapEvent {
+        DecodedPumpFunSwapEvent {
             accounts: SwapEventAccounts {
                 pool: decoded_buy_log.mint.clone(),
                 user: decoded_buy_log.user.clone(),
@@ -167,13 +167,13 @@ impl PumpAmmInstructionParser {
 
     pub fn decode_sell_event(
         instruction: &StructuredInstruction,
-    ) -> DecodedSwapEvent {
+    ) -> DecodedPumpFunSwapEvent {
         let inner_instructions = &instruction.inner_instructions;
         let last_ix = &inner_instructions.last().unwrap();
         let sell_log = if last_ix.data.len() < 233 {inner_instructions.get(inner_instructions.len().wrapping_sub(2)).unwrap()} else {last_ix};
         let decoded_sell_log = Self::decode_sell_log(&sell_log.data);
 
-        DecodedSwapEvent {
+        DecodedPumpFunSwapEvent {
             accounts: SwapEventAccounts {
                 pool: decoded_sell_log.mint.clone(),
                 user: decoded_sell_log.user.clone(),
