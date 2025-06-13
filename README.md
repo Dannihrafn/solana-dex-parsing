@@ -98,11 +98,3 @@ The parser can be configured through command-line arguments:
 ```bash
 cargo test
 ```
-
-## License
-
-[Add your license here]
-
-## Contributing
-
-[Add contribution guidelines here]
