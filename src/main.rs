@@ -3,6 +3,7 @@ use {
     clap::Parser as ClapParser,
     futures::{future::TryFutureExt, sink::SinkExt, stream::StreamExt},
     log::{error, info},
+    parser_core::TransactionParser,
     serde::{Deserialize, Serialize},
     serde_json,
     std::{collections::HashMap, env, sync::Arc, time::Duration},
@@ -89,10 +90,7 @@ struct State {
     attempts_since_success: u32,
 }
 
-
-
 const MAX_RETRY_WITH_FROM_SLOT: u32 = 5;
-
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -110,12 +108,15 @@ async fn main() -> anyhow::Result<()> {
         attempts_since_success: 0,
     }));
 
+    let parser = TransactionParser::new();
+
     // The default exponential backoff strategy intervals:
     // [500ms, 750ms, 1.125s, 1.6875s, 2.53125s, 3.796875s, 5.6953125s,
     // 8.5s, 12.8s, 19.2s, 28.8s, 43.2s, 64.8s, 97s, ... ]
     retry(ExponentialBackoff::default(), move || {
         let args = args.clone();
         let state = state.clone();
+        let parser = parser.clone();
 
         async move {
             // decide whether to send `from_slot` this time
@@ -153,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            geyser_subscribe(client, request, state.clone())
+            geyser_subscribe(client, request, state.clone(), parser)
                 .await
                 .map_err(backoff::Error::transient)?;
 
@@ -175,6 +176,7 @@ async fn geyser_subscribe(
     mut client: GeyserGrpcClient<impl Interceptor>,
     request: SubscribeRequest,
     state: Arc<Mutex<State>>,
+    parser: TransactionParser,
 ) -> anyhow::Result<()> {
     let (mut subscribe_tx, mut stream) = client.subscribe_with_request(Some(request)).await?;
 
@@ -226,6 +228,8 @@ async fn geyser_subscribe(
                         );
 
                         let raw_transaction = txn.transaction.expect("transaction empty");
+                        let decoded_txn = parser.decode_transaction(&upd_clone);
+                        println!("{:?}", decoded_txn);
                         let raw_message = raw_transaction.message.expect("message empty").clone();
                         let _header = raw_message.header.expect("header empty");
                         let _meta = txn.meta.expect("Meta empty");

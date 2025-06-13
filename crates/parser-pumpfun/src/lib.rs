@@ -1,11 +1,13 @@
 use bs58;
+use instruction_parser::InstructionParser;
 use types::{
     DecodedEvent, DecodedPumpFunCreatePoolEvent, DecodedPumpFunEvent, DecodedPumpFunSwapEvent,
     DecodedPumpFunSwapLog, StructuredInstruction, SwapEventAccounts, TransactionType,
 };
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
-use instruction_parser::InstructionParser;
+
+#[derive(Clone)]
 pub struct PumpFunInstructionParser {}
 
 impl InstructionParser for PumpFunInstructionParser {
@@ -196,6 +198,9 @@ impl PumpFunInstructionParser {
         let data: &Vec<u8> = &instruction.data;
         let mut offset = 8;
         let name_length = u32::from_le_bytes(data[0..4].try_into().unwrap());
+        if name_length > 100 {
+            println!("{:?}", data);
+        }
         offset += 4;
         let name = String::from_utf8(data[offset..4 + name_length as usize].to_vec()).unwrap();
         offset += name_length as usize;

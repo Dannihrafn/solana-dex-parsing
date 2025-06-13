@@ -23,6 +23,7 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
+ "parser-core",
  "serde",
  "serde_json",
  "tokio",
@@ -1886,7 +1887,6 @@ name = "instruction-parser"
 version = "0.1.0"
 dependencies = [
  "types",
- "yellowstone-grpc-proto",
 ]
 
 [[package]]

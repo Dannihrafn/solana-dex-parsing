@@ -1,4 +1,5 @@
 use bs58;
+use instruction_parser::InstructionParser;
 use types::{
     DecodedEvent, DecodedPumpAmmBuyLog, DecodedPumpAmmCreatePoolEvent, DecodedPumpAmmEvent,
     DecodedPumpAmmSellLog, DecodedPumpAmmSwapEvent, PumpAmmTransaction, StructuredInstruction,
@@ -6,7 +7,8 @@ use types::{
 };
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
-use instruction_parser::InstructionParser;
+
+#[derive(Clone)]
 pub struct PumpAmmInstructionParser {}
 
 impl InstructionParser for PumpAmmInstructionParser {
@@ -42,7 +44,7 @@ impl PumpAmmInstructionParser {
     const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
     const DEPOSIT_DISCRIMINATOR: [u8; 8] = [242, 35, 198, 137, 82, 225, 242, 182];
     const WITHDRAW_DISCRIMINATOR: [u8; 8] = [183, 18, 70, 156, 148, 109, 161, 34];
-    
+
     pub fn decode_transaction(
         &self,
         transaction: &SubscribeUpdateTransaction,
@@ -103,6 +105,9 @@ impl PumpAmmInstructionParser {
         let base_mint = account_keys[account_key_indexes[3] as usize].clone();
         let quote_mint = account_keys[account_key_indexes[4] as usize].clone();
         let buy_log = instruction.inner_instructions.last().unwrap();
+        if buy_log.data.len() < 352 {
+            println!("{:?}", instruction);
+        }
         let decoded_buy_log = Self::decode_buy_log(&buy_log.data).unwrap();
         let mint_in_reserve = decoded_buy_log.pool_base_token_reserves.clone();
         let mint_out_reserve = decoded_buy_log.pool_quote_token_reserves.clone();
@@ -126,6 +131,7 @@ impl PumpAmmInstructionParser {
 
     pub fn decode_buy_log(data: &[u8]) -> Option<DecodedPumpAmmBuyLog> {
         if data.len() < 352 {
+            println!("data: {:?}", data);
             return None;
         }
         let mut offset: usize = 24;

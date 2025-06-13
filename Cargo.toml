@@ -30,6 +30,7 @@ tonic = "0.12.1"
 yellowstone-grpc-client = "4.0.0"
 yellowstone-grpc-proto = { version = "4.0.0", default-features = false ,features = ["plugin"] }
 serde_json = "1.0.135"
+parser-core = { workspace = true }
 
 [workspace.dependencies]
 types = { path = "crates/types" }
