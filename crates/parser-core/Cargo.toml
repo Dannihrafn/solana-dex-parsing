@@ -6,4 +6,7 @@ edition = "2024"
 [dependencies]
 types = { workspace = true }
 utils = { workspace = true }
+parser-pump-amm = { workspace = true }
+parser-pumpfun = { workspace = true }
+instruction-parser = { workspace = true }
 yellowstone-grpc-proto = { version = "4.0.0", default-features = false, features = ["plugin"] }

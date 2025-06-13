@@ -1,86 +1,50 @@
 use bs58;
-use types::{StructuredInstruction, TransactionType};
+use types::{
+    DecodedEvent, DecodedPumpFunCreatePoolEvent, DecodedPumpFunEvent, DecodedPumpFunSwapEvent,
+    DecodedPumpFunSwapLog, StructuredInstruction, SwapEventAccounts, TransactionType,
+};
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
-#[derive(Debug)]
-pub struct DecodedPumpFunSwapLog {
-    mint: String,
-    sol_amount: u64,
-    token_amount: u64,
-    user: String,
-    virtual_sol_reserves: u64,
-    virtual_token_reserves: u64,
-}
+use instruction_parser::InstructionParser;
+pub struct PumpFunInstructionParser {}
 
-#[derive(Debug)]
-pub struct DecodedPumpAmmSellLog {
-    base_amount_in: u64,
-    pool_base_token_reserves: u64,
-    pool_quote_token_reserves: u64,
-    quote_amount_out: u64,
-    coin_creator: String,
-}
-#[derive(Debug)]
-pub struct DecodedPumpFunCreatePoolEvent {
-    name: String,
-    symbol: String,
-    uri: String,
-    creator: String,
-    base_mint: String,
-    quote_mint: String,
-    bonding_curve: String,
-    associated_bonding_curve: String,
-    event_type: TransactionType
-}
-
-#[derive(Debug)]
-pub enum DecodedPumpFunEvent {
-    Swap(DecodedPumpFunSwapEvent),
-    CreatePool(DecodedPumpFunCreatePoolEvent),
-    //Withdraw(DecodedWithdrawEvent),
-    //Deposit(DecodedDepositEvent),
-}
-
-#[derive(Debug)]
-struct SwapEventAccounts {
-    pool: String,
-    user: String,
-    base_mint: String,
-    quote_mint: String,
-}
-
-#[derive(Debug)]
-pub struct DecodedPumpFunSwapEvent {
-    accounts: SwapEventAccounts,
-    mint_in: String,
-    mint_out: String,
-    amount_in: u64,
-    amount_out: u64,
-    mint_in_reserve: u64,
-    mint_out_reserve: u64,
-    event_type: TransactionType,
-}
-
-pub struct PumpAmmInstructionParser {}
-
-impl PumpAmmInstructionParser {
-    pub const PROGRAM_ID: &'static str = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
-    pub const WSOL_ADDRESS: &'static str = "So11111111111111111111111111111111111111112";
-    pub const POOL_CREATION_DISCRIMINATOR: [u8; 8] = [
-        24, 30, 200, 40, 5, 28, 7, 119,
-    ];
-    pub const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
-    pub const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
-
-    pub fn new() -> Self {
+impl InstructionParser for PumpFunInstructionParser {
+    fn new() -> Self {
         Self {}
     }
 
-    pub fn get_program_id(&self) -> &str {
+    fn get_program_id(&self) -> &str {
         Self::PROGRAM_ID
     }
 
-    pub fn decode_transaction(&self, transaction: &SubscribeUpdateTransaction) -> Vec<DecodedPumpFunEvent> {
+    fn decode_instructions(
+        &self,
+        instructions: Vec<StructuredInstruction>,
+        account_keys: &Vec<String>,
+    ) -> Vec<DecodedEvent> {
+        instructions
+            .iter()
+            .filter_map(
+                |instruction| match self.decode_instruction(instruction, &account_keys) {
+                    Some(decoded_instruction) => Some(DecodedEvent::PumpFun(decoded_instruction)),
+                    None => None,
+                },
+            )
+            .collect()
+    }
+}
+
+impl PumpFunInstructionParser {
+    const PROGRAM_ID: &'static str = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
+    const WSOL_ADDRESS: &'static str = "So11111111111111111111111111111111111111112";
+    const POOL_CREATION_DISCRIMINATOR: [u8; 8] = [24, 30, 200, 40, 5, 28, 7, 119];
+    const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
+    const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
+
+    pub fn decode_transaction(
+        &self,
+        transaction: &SubscribeUpdateTransaction,
+    ) -> Vec<DecodedPumpFunEvent> {
         let account_keys: Vec<String> = get_account_keys(transaction);
         let ixs: Vec<StructuredInstruction> =
             get_filtered_instructions(transaction, &account_keys, self.get_program_id());
@@ -109,19 +73,23 @@ impl PumpAmmInstructionParser {
                 instruction,
             )));
         } else if discriminator == Self::POOL_CREATION_DISCRIMINATOR {
-            return Some(DecodedPumpFunEvent::CreatePool(Self::decode_pool_creation_event(
-                instruction,
-                account_keys,
-            )));
+            return Some(DecodedPumpFunEvent::CreatePool(
+                Self::decode_pool_creation_event(instruction, account_keys),
+            ));
         }
         None
     }
 
-    pub fn decode_buy_event(
-        instruction: &StructuredInstruction,
-    ) -> DecodedPumpFunSwapEvent {
+    pub fn decode_buy_event(instruction: &StructuredInstruction) -> DecodedPumpFunSwapEvent {
         let last_ix = instruction.inner_instructions.last().unwrap();
-        let buy_log = if last_ix.data.len() < 233 {instruction.inner_instructions.get(instruction.inner_instructions.len().wrapping_sub(2)).unwrap()} else {last_ix};
+        let buy_log = if last_ix.data.len() < 233 {
+            instruction
+                .inner_instructions
+                .get(instruction.inner_instructions.len().wrapping_sub(2))
+                .unwrap()
+        } else {
+            last_ix
+        };
         let decoded_buy_log = Self::decode_buy_log(&buy_log.data);
 
         DecodedPumpFunSwapEvent {
@@ -153,7 +121,8 @@ impl PumpAmmInstructionParser {
         offset += 40;
         let virtual_sol_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
         offset += 8;
-        let virtual_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        let virtual_token_reserves =
+            u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
 
         DecodedPumpFunSwapLog {
             mint,
@@ -165,12 +134,16 @@ impl PumpAmmInstructionParser {
         }
     }
 
-    pub fn decode_sell_event(
-        instruction: &StructuredInstruction,
-    ) -> DecodedPumpFunSwapEvent {
+    pub fn decode_sell_event(instruction: &StructuredInstruction) -> DecodedPumpFunSwapEvent {
         let inner_instructions = &instruction.inner_instructions;
         let last_ix = &inner_instructions.last().unwrap();
-        let sell_log = if last_ix.data.len() < 233 {inner_instructions.get(inner_instructions.len().wrapping_sub(2)).unwrap()} else {last_ix};
+        let sell_log = if last_ix.data.len() < 233 {
+            inner_instructions
+                .get(inner_instructions.len().wrapping_sub(2))
+                .unwrap()
+        } else {
+            last_ix
+        };
         let decoded_sell_log = Self::decode_sell_log(&sell_log.data);
 
         DecodedPumpFunSwapEvent {
@@ -202,7 +175,8 @@ impl PumpAmmInstructionParser {
         offset += 40;
         let virtual_sol_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
         offset += 8;
-        let virtual_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        let virtual_token_reserves =
+            u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
 
         DecodedPumpFunSwapLog {
             mint,
@@ -223,21 +197,24 @@ impl PumpAmmInstructionParser {
         let mut offset = 8;
         let name_length = u32::from_le_bytes(data[0..4].try_into().unwrap());
         offset += 4;
-        let name = String::from_utf8(data[offset.. 4 + name_length as usize].to_vec()).unwrap();
+        let name = String::from_utf8(data[offset..4 + name_length as usize].to_vec()).unwrap();
         offset += name_length as usize;
         let symbol_length = u32::from_le_bytes(data[offset..4].try_into().unwrap());
         offset += 4;
-        let symbol = String::from_utf8(data[offset.. 4 + symbol_length as usize].to_vec()).unwrap();
+        let symbol = String::from_utf8(data[offset..4 + symbol_length as usize].to_vec()).unwrap();
         offset += symbol_length as usize;
         let uri_length = u32::from_le_bytes(data[offset..4].try_into().unwrap());
         offset += 4;
-        let uri = String::from_utf8(data[offset.. 4 + uri_length as usize].to_vec()).unwrap();
+        let uri = String::from_utf8(data[offset..4 + uri_length as usize].to_vec()).unwrap();
         offset += uri_length as usize;
         let coin_creator = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
 
-        let mint = bs58::encode(account_keys[account_key_indexes[0] as usize].clone()).into_string();
-        let bonding_curve = bs58::encode(account_keys[account_key_indexes[2] as usize].clone()).into_string();
-        let associated_bonding_curve = bs58::encode(account_keys[account_key_indexes[3] as usize].clone()).into_string();
+        let mint =
+            bs58::encode(account_keys[account_key_indexes[0] as usize].clone()).into_string();
+        let bonding_curve =
+            bs58::encode(account_keys[account_key_indexes[2] as usize].clone()).into_string();
+        let associated_bonding_curve =
+            bs58::encode(account_keys[account_key_indexes[3] as usize].clone()).into_string();
 
         DecodedPumpFunCreatePoolEvent {
             name,
@@ -251,5 +228,4 @@ impl PumpAmmInstructionParser {
             event_type: TransactionType::CreatePool,
         }
     }
-
 }

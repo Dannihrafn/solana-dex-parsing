@@ -1,5 +1,5 @@
 use bs58;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use types::{
     InnerInstruction, StructuredInstruction,
 };
@@ -166,4 +166,19 @@ pub fn filter_instructions(
         }
         None => panic!("Program index could not be found"),
     }
+}
+
+pub fn filter_instructions_new(
+    structured_instructions: &Vec<StructuredInstruction>,
+    account_keys: &Vec<String>,
+    program_ids: HashSet<String>,
+) -> HashMap<String, Vec<StructuredInstruction>> {
+    let mut ret: HashMap<String, Vec<StructuredInstruction>> = HashMap::new();
+    for instruction in structured_instructions {
+        let program_id = &account_keys[instruction.program_id_index as usize];
+        if program_ids.contains(program_id) {
+            ret.entry(program_id.into()).or_default().push(instruction.clone());
+        }
+    }
+    ret
 }

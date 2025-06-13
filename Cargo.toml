@@ -8,6 +8,7 @@ members = [
     "crates/parser-pumpfun",
     "crates/parser-raydium",
     "crates/grpc-server",
+    "crates/instruction-parser",
 ]
 
 [package]
@@ -17,9 +18,6 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0.197", features = ["derive"]}
-types = { workspace = true }
-utils = { workspace = true }
-parser-pump-amm = { workspace = true }
 anyhow = "1.0.62"
 backoff = { version = "0.4.0", features = ["tokio"] }
 bs58 = "0.5.1"
@@ -31,11 +29,6 @@ tokio = { version = "1.21.2", features = ["rt-multi-thread", "fs"] }
 tonic = "0.12.1"
 yellowstone-grpc-client = "4.0.0"
 yellowstone-grpc-proto = { version = "4.0.0", default-features = false ,features = ["plugin"] }
-solana-sdk = "2.1.7"
-solana-transaction-status = "2.1.7"
-solana-program = "2.1.7"
-solana-account-decoder-client-types = "2.1.7"
-serde_with = "3.0"
 serde_json = "1.0.135"
 
 [workspace.dependencies]
@@ -43,3 +36,5 @@ types = { path = "crates/types" }
 parser-core = { path = "crates/parser-core" }
 utils = { path = "crates/utils" }
 parser-pump-amm = { path = "crates/parser-pump-amm" }
+parser-pumpfun = { path = "crates/parser-pumpfun" }
+instruction-parser = { path = "crates/instruction-parser" }

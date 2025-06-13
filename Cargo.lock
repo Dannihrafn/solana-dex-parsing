@@ -23,18 +23,10 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
- "parser-pump-amm",
  "serde",
  "serde_json",
- "serde_with",
- "solana-account-decoder-client-types",
- "solana-program",
- "solana-sdk",
- "solana-transaction-status",
  "tokio",
  "tonic",
- "types",
- "utils",
  "yellowstone-grpc-client",
  "yellowstone-grpc-proto",
 ]
@@ -1890,6 +1882,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "instruction-parser"
+version = "0.1.0"
+dependencies = [
+ "types",
+ "yellowstone-grpc-proto",
+]
+
+[[package]]
 name = "ipnet"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2371,6 +2371,9 @@ dependencies = [
 name = "parser-core"
 version = "0.1.0"
 dependencies = [
+ "instruction-parser",
+ "parser-pump-amm",
+ "parser-pumpfun",
  "types",
  "utils",
  "yellowstone-grpc-proto",
@@ -2381,6 +2384,7 @@ name = "parser-pump-amm"
 version = "0.1.0"
 dependencies = [
  "bs58",
+ "instruction-parser",
  "types",
  "utils",
  "yellowstone-grpc-proto",
@@ -2391,6 +2395,7 @@ name = "parser-pumpfun"
 version = "0.1.0"
 dependencies = [
  "bs58",
+ "instruction-parser",
  "types",
  "utils",
  "yellowstone-grpc-proto",

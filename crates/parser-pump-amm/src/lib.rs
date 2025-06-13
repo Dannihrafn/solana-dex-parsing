@@ -1,95 +1,66 @@
 use bs58;
-use types::{PumpAmmTransaction, StructuredInstruction, TransactionType};
+use types::{
+    DecodedEvent, DecodedPumpAmmBuyLog, DecodedPumpAmmCreatePoolEvent, DecodedPumpAmmEvent,
+    DecodedPumpAmmSellLog, DecodedPumpAmmSwapEvent, PumpAmmTransaction, StructuredInstruction,
+    SwapEventAccounts, TransactionType,
+};
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
-
-#[derive(Debug)]
-pub struct DecodedPumpAmmBuyLog {
-    quote_amount_in: u64,
-    base_amount_out: u64,
-    pool_base_token_reserves: u64,
-    pool_quote_token_reserves: u64,
-    coin_creator: String,
-}
-
-#[derive(Debug)]
-pub struct DecodedPumpAmmSellLog {
-    base_amount_in: u64,
-    pool_base_token_reserves: u64,
-    pool_quote_token_reserves: u64,
-    quote_amount_out: u64,
-    coin_creator: String,
-}
-#[derive(Debug)]
-pub struct DecodedPumpAmmCreatePoolEvent {
-    pool: String,
-    creator: String,
-    base_mint: String,
-    quote_mint: String,
-    pool_base_token_reserve: u64,
-    pool_quote_token_reserve: u64,
-    pool_base_token_account: String,
-    pool_quote_token_account: String,
-    index: u16,
-    event_type: TransactionType,
-}
-
-#[derive(Debug)]
-pub enum DecodedPumpAmmEvent {
-    Swap(DecodedPumpAmmSwapEvent),
-    CreatePool(DecodedPumpAmmCreatePoolEvent),
-    //Withdraw(DecodedWithdrawEvent),
-    //Deposit(DecodedDepositEvent),
-}
-
-#[derive(Debug)]
-struct SwapEventAccounts {
-    pool: String,
-    user: String,
-    base_mint: String,
-    quote_mint: String,
-}
-
-#[derive(Debug)]
-pub struct DecodedPumpAmmSwapEvent {
-    accounts: SwapEventAccounts,
-    mint_in: String,
-    mint_out: String,
-    amount_in: u64,
-    amount_out: u64,
-    mint_in_reserve: u64,
-    mint_out_reserve: u64,
-    event_type: TransactionType,
-}
-
+use instruction_parser::InstructionParser;
 pub struct PumpAmmInstructionParser {}
 
-impl PumpAmmInstructionParser {
-    pub const PROGRAM_ID: &'static str = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
-    pub const POOL_CREATION_DISCRIMINATOR: [u8; 8] = [233, 146, 209, 142, 207, 104, 64, 188];
-    pub const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
-    pub const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
-    pub const DEPOSIT_DISCRIMINATOR: [u8; 8] = [242, 35, 198, 137, 82, 225, 242, 182];
-    pub const WITHDRAW_DISCRIMINATOR: [u8; 8] = [183, 18, 70, 156, 148, 109, 161, 34];
-
-    pub fn new() -> Self {
+impl InstructionParser for PumpAmmInstructionParser {
+    fn new() -> Self {
         Self {}
     }
 
-    pub fn get_program_id(&self) -> &str {
+    fn get_program_id(&self) -> &str {
         Self::PROGRAM_ID
     }
 
-    pub fn decode_transaction(&self, transaction: &SubscribeUpdateTransaction) -> Vec<DecodedPumpAmmEvent> {
+    fn decode_instructions(
+        &self,
+        instructions: Vec<StructuredInstruction>,
+        account_keys: &Vec<String>,
+    ) -> Vec<DecodedEvent> {
+        instructions
+            .iter()
+            .filter_map(
+                |instruction| match self.decode_instruction(instruction, &account_keys) {
+                    Some(decoded_instruction) => Some(DecodedEvent::PumpAmm(decoded_instruction)),
+                    None => None,
+                },
+            )
+            .collect()
+    }
+}
+
+impl PumpAmmInstructionParser {
+    const PROGRAM_ID: &'static str = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+    const POOL_CREATION_DISCRIMINATOR: [u8; 8] = [233, 146, 209, 142, 207, 104, 64, 188];
+    const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
+    const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
+    const DEPOSIT_DISCRIMINATOR: [u8; 8] = [242, 35, 198, 137, 82, 225, 242, 182];
+    const WITHDRAW_DISCRIMINATOR: [u8; 8] = [183, 18, 70, 156, 148, 109, 161, 34];
+    
+    pub fn decode_transaction(
+        &self,
+        transaction: &SubscribeUpdateTransaction,
+    ) -> Vec<DecodedEvent> {
         let account_keys: Vec<String> = get_account_keys(transaction);
         let ixs: Vec<StructuredInstruction> =
             get_filtered_instructions(transaction, &account_keys, self.get_program_id());
         if ixs.is_empty() {
             return Vec::new();
         }
-        let decoded_instructions: Vec<DecodedPumpAmmEvent> = ixs
+        let decoded_instructions: Vec<DecodedEvent> = ixs
             .iter()
-            .filter_map(|instruction| self.decode_instruction(instruction, &account_keys))
+            .filter_map(
+                |instruction| match self.decode_instruction(instruction, &account_keys) {
+                    Some(decoded_instruction) => Some(DecodedEvent::PumpAmm(decoded_instruction)),
+                    None => None,
+                },
+            )
             .collect();
         decoded_instructions
     }
@@ -111,10 +82,9 @@ impl PumpAmmInstructionParser {
                 account_keys,
             )));
         } else if discriminator == Self::POOL_CREATION_DISCRIMINATOR {
-            return Some(DecodedPumpAmmEvent::CreatePool(Self::decode_pool_creation_event(
-                instruction,
-                account_keys,
-            )));
+            return Some(DecodedPumpAmmEvent::CreatePool(
+                Self::decode_pool_creation_event(instruction, account_keys),
+            ));
         } /*else if discriminator == Self::WITHDRAW_DISCRIMINATOR {
         return Self::decode_withdraw_event(instruction, account_keys);
         } else if discriminator == Self::DEPOSIT_DISCRIMINATOR {
@@ -176,6 +146,7 @@ impl PumpAmmInstructionParser {
             pool_base_token_reserves,
             pool_quote_token_reserves,
             coin_creator,
+            transaction_type: TransactionType::Buy,
         });
     }
 
@@ -230,6 +201,7 @@ impl PumpAmmInstructionParser {
             pool_quote_token_reserves,
             quote_amount_out,
             coin_creator,
+            transaction_type: TransactionType::Sell,
         });
     }
 
