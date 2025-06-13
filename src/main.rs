@@ -3,7 +3,7 @@ use {
     clap::Parser as ClapParser,
     futures::{future::TryFutureExt, sink::SinkExt, stream::StreamExt},
     log::{error, info},
-    parser_core::TransactionParser,
+    parser_core::TransactionParserNew,
     serde::{Deserialize, Serialize},
     serde_json,
     std::{collections::HashMap, env, sync::Arc, time::Duration},
@@ -108,7 +108,7 @@ async fn main() -> anyhow::Result<()> {
         attempts_since_success: 0,
     }));
 
-    let parser = TransactionParser::new();
+    let parser = TransactionParserNew::new();
 
     // The default exponential backoff strategy intervals:
     // [500ms, 750ms, 1.125s, 1.6875s, 2.53125s, 3.796875s, 5.6953125s,
@@ -176,7 +176,7 @@ async fn geyser_subscribe(
     mut client: GeyserGrpcClient<impl Interceptor>,
     request: SubscribeRequest,
     state: Arc<Mutex<State>>,
-    parser: TransactionParser,
+    parser: TransactionParserNew,
 ) -> anyhow::Result<()> {
     let (mut subscribe_tx, mut stream) = client.subscribe_with_request(Some(request)).await?;
 
@@ -227,9 +227,14 @@ async fn geyser_subscribe(
                             timestamp,
                         );
 
-                        let raw_transaction = txn.transaction.expect("transaction empty");
+                        let raw_transaction = txn.clone().transaction.expect("transaction empty");
                         let decoded_txn = parser.decode_transaction(&upd_clone);
-                        println!("{:?}", decoded_txn);
+                        if decoded_txn.is_empty() && has_balance_change(&upd_clone) {
+                            println!(
+                                "https://solscan.io/tx/{}",
+                                bs58::encode(&raw_signature).into_string()
+                            );
+                        }
                         let raw_message = raw_transaction.message.expect("message empty").clone();
                         let _header = raw_message.header.expect("header empty");
                         let _meta = txn.meta.expect("Meta empty");
@@ -270,4 +275,46 @@ async fn geyser_subscribe(
         st.attempts_since_success += 1;
     }
     Ok(())
+}
+
+pub fn has_balance_change(transaction: &SubscribeUpdateTransaction) -> bool {
+    let meta = transaction.clone().transaction.unwrap().meta.unwrap();
+    let pre_token_balances = meta.pre_token_balances;
+    let post_token_balances = meta.post_token_balances;
+    let mut has_balance_c = false;
+    for balance in pre_token_balances.clone() {
+        let mint = balance.mint;
+        let owner = balance.owner;
+        let post_balance = post_token_balances
+            .iter()
+            .find(|post_balance| post_balance.mint == mint && post_balance.owner == owner);
+        match post_balance {
+            Some(post_balance) => {
+                let pre_amount = balance.ui_token_amount.unwrap().ui_amount;
+                let post_amount = post_balance.clone().ui_token_amount.unwrap().ui_amount;
+                if pre_amount != post_amount {
+                    has_balance_c = true;
+                }
+            }
+            None => {}
+        }
+    }
+    for balance in post_token_balances {
+        let mint = balance.mint;
+        let owner = balance.owner;
+        let pre_balance = pre_token_balances
+            .iter()
+            .find(|pre_balance| pre_balance.mint == mint && pre_balance.owner == owner);
+        match pre_balance {
+            Some(pre_balance) => {
+                let post_amount = balance.ui_token_amount.unwrap().ui_amount;
+                let pre_amount = pre_balance.clone().ui_token_amount.unwrap().ui_amount;
+                if pre_amount != post_amount {
+                    has_balance_c = true;
+                }
+            }
+            None => {}
+        }
+    }
+    has_balance_c
 }
