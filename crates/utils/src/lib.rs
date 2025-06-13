@@ -1,6 +1,6 @@
 use bs58;
 use std::collections::{HashMap, HashSet};
-use types::{InnerInstruction, StructuredInstruction};
+use types::{StructuredInstruction};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
 pub fn get_account_keys(transaction: &SubscribeUpdateTransaction) -> Vec<String> {
@@ -38,7 +38,6 @@ pub fn get_filtered_instructions(
 pub fn structure_all_instructions(
     transaction: &SubscribeUpdateTransaction,
 ) -> Vec<StructuredInstruction> {
-    let max_depth: usize = 3;
     let txn = &transaction.transaction.clone().unwrap();
     let compiled_instructions = txn
         .transaction
