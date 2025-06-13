@@ -9,7 +9,7 @@ use utils::{
 };
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ParserEnum {
     PumpAmm(PumpAmmInstructionParser),
     PumpFun(PumpFunInstructionParser),
@@ -38,7 +38,7 @@ impl InstructionParser for ParserEnum {
         }
     }
 }
-
+#[derive(Clone, Debug)]
 pub struct TransactionParserNew {
     parsers: HashMap<String, ParserEnum>,
     program_ids: HashSet<String>,
@@ -79,7 +79,7 @@ impl TransactionParserNew {
         filter_instructions_new(
             &structured_instructions,
             &account_keys,
-            self.program_ids.clone(),
+            &self.program_ids.clone(),
         )
     }
 
@@ -99,7 +99,7 @@ impl TransactionParserNew {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TransactionParser {
     parsers: HashMap<String, ParserEnum>,
 }
@@ -144,14 +144,13 @@ impl TransactionParser {
         let parsers = self.get_parsers(tx);
         let mut decoded_instructions = Vec::new();
 
-        for parser in parsers {
+        for parser in parsers.clone() {
             let account_keys = get_account_keys(tx);
             let instructions =
                 get_filtered_instructions(tx, &account_keys, parser.get_program_id());
-            let mut results = parser.decode_instructions(instructions, &account_keys);
+            let mut results = parser.decode_instructions(instructions.clone(), &account_keys);
             decoded_instructions.append(&mut results);
         }
-
         decoded_instructions
     }
 }

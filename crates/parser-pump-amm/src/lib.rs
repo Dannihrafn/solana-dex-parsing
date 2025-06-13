@@ -8,7 +8,7 @@ use types::{
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PumpAmmInstructionParser {}
 
 impl InstructionParser for PumpAmmInstructionParser {
@@ -25,7 +25,7 @@ impl InstructionParser for PumpAmmInstructionParser {
         instructions: Vec<StructuredInstruction>,
         account_keys: &Vec<String>,
     ) -> Vec<DecodedEvent> {
-        instructions
+        let ixs: Vec<DecodedEvent> = instructions
             .iter()
             .filter_map(
                 |instruction| match self.decode_instruction(instruction, &account_keys) {
@@ -33,7 +33,11 @@ impl InstructionParser for PumpAmmInstructionParser {
                     None => None,
                 },
             )
-            .collect()
+            .collect();
+        if ixs.is_empty() {
+            println!("empty instructions: {:?}", instructions);
+        }
+        ixs
     }
 }
 
@@ -94,7 +98,6 @@ impl PumpAmmInstructionParser {
         }*/
         None
     }
-
     pub fn decode_buy_event(
         instruction: &StructuredInstruction,
         account_keys: &[String],
@@ -106,7 +109,11 @@ impl PumpAmmInstructionParser {
         let quote_mint = account_keys[account_key_indexes[4] as usize].clone();
         let buy_log = instruction.inner_instructions.last().unwrap();
         if buy_log.data.len() < 352 {
-            println!("{:?}", instruction);
+            println!("instruction: {:?}", instruction);
+            println!("-----------------------------------------------------------------");
+            println!("inner_instructions: {:?}", instruction.inner_instructions);
+            println!("-----------------------------------------------------------------");
+            println!("buy_log: {:?}", buy_log);
         }
         let decoded_buy_log = Self::decode_buy_log(&buy_log.data).unwrap();
         let mint_in_reserve = decoded_buy_log.pool_base_token_reserves.clone();

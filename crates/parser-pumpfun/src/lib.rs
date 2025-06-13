@@ -7,7 +7,7 @@ use types::{
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PumpFunInstructionParser {}
 
 impl InstructionParser for PumpFunInstructionParser {
@@ -196,21 +196,24 @@ impl PumpFunInstructionParser {
     ) -> DecodedPumpFunCreatePoolEvent {
         let account_key_indexes: &Vec<u8> = &instruction.account_key_indexes;
         let data: &Vec<u8> = &instruction.data;
+        if data.len() < 8 {
+            println!("instruction: {:?}", instruction)
+        }
         let mut offset = 8;
-        let name_length = u32::from_le_bytes(data[0..4].try_into().unwrap());
+        let name_length = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
         if name_length > 100 {
             println!("{:?}", data);
         }
         offset += 4;
-        let name = String::from_utf8(data[offset..4 + name_length as usize].to_vec()).unwrap();
+        let name = String::from_utf8(data[offset..offset + name_length as usize].to_vec()).unwrap();
         offset += name_length as usize;
-        let symbol_length = u32::from_le_bytes(data[offset..4].try_into().unwrap());
+        let symbol_length = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
         offset += 4;
-        let symbol = String::from_utf8(data[offset..4 + symbol_length as usize].to_vec()).unwrap();
+        let symbol = String::from_utf8(data[offset..offset + symbol_length as usize].to_vec()).unwrap();
         offset += symbol_length as usize;
-        let uri_length = u32::from_le_bytes(data[offset..4].try_into().unwrap());
+        let uri_length = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
         offset += 4;
-        let uri = String::from_utf8(data[offset..4 + uri_length as usize].to_vec()).unwrap();
+        let uri = String::from_utf8(data[offset..offset + uri_length as usize].to_vec()).unwrap();
         offset += uri_length as usize;
         let coin_creator = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
 

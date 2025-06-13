@@ -1,8 +1,6 @@
 use bs58;
 use std::collections::{HashMap, HashSet};
-use types::{
-    InnerInstruction, StructuredInstruction,
-};
+use types::{InnerInstruction, StructuredInstruction};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
 pub fn get_account_keys(transaction: &SubscribeUpdateTransaction) -> Vec<String> {
@@ -17,10 +15,13 @@ pub fn get_account_keys(transaction: &SubscribeUpdateTransaction) -> Vec<String>
         .into_iter()
         .map(|key| bs58::encode(key).into_string())
         .collect()
-
 }
 
-pub fn get_filtered_instructions(transaction: &SubscribeUpdateTransaction, account_keys: &Vec<String>, program_id: &str) -> Vec<StructuredInstruction> {
+pub fn get_filtered_instructions(
+    transaction: &SubscribeUpdateTransaction,
+    account_keys: &Vec<String>,
+    program_id: &str,
+) -> Vec<StructuredInstruction> {
     let program_index = account_keys.iter().position(|key| *key == *program_id);
     match program_index {
         Some(_) => {}
@@ -29,54 +30,123 @@ pub fn get_filtered_instructions(transaction: &SubscribeUpdateTransaction, accou
         }
     }
     let structured_instructions = structure_all_instructions(&transaction);
-    let filtered_instructions = filter_instructions(&structured_instructions, account_keys, program_id);
+    let filtered_instructions =
+        filter_instructions(&structured_instructions, account_keys, program_id);
     filtered_instructions
 }
 
-pub fn structure_all_instructions(transaction: &SubscribeUpdateTransaction) -> Vec<StructuredInstruction> {
+pub fn structure_all_instructions(
+    transaction: &SubscribeUpdateTransaction,
+) -> Vec<StructuredInstruction> {
     let max_depth: usize = 3;
     let txn = &transaction.transaction.clone().unwrap();
-    let compiled_instructions =
-        txn.transaction.clone().unwrap().message.unwrap().instructions;
+    let compiled_instructions = txn
+        .transaction
+        .clone()
+        .unwrap()
+        .message
+        .unwrap()
+        .instructions;
     let inner_instructions = txn.meta.clone().unwrap().inner_instructions;
 
     if inner_instructions.is_empty() {
         return compiled_instructions
             .iter()
-            .map(
-                |instruction| StructuredInstruction {
-                    account_key_indexes: instruction.accounts.clone(),
-                    program_id_index: instruction.program_id_index as u8,
-                    data: instruction.data.clone(),
-                    inner_instructions: Vec::new(),
-                },
-            )
+            .map(|instruction| StructuredInstruction {
+                account_key_indexes: instruction.accounts.clone(),
+                program_id_index: instruction.program_id_index as u8,
+                data: instruction.data.clone(),
+                inner_instructions: Vec::new(),
+                stack_height: 0,
+            })
             .collect();
     }
 
     let mut formatted: Vec<StructuredInstruction> = Vec::new();
 
     for inner_instruction_group in inner_instructions.iter() {
-        let parent_ix =
-            &compiled_instructions[inner_instruction_group.index as usize];
+        let parent_ix = &compiled_instructions[inner_instruction_group.index as usize];
 
         let mut parent = StructuredInstruction {
             account_key_indexes: parent_ix.accounts.clone(),
             program_id_index: parent_ix.program_id_index as u8,
             data: parent_ix.data.clone(),
             inner_instructions: Vec::new(),
+            stack_height: 1,
         };
 
+        for inner_instruction in inner_instruction_group.instructions.iter() {
+            match inner_instruction.stack_height {
+                Some(stack_height) => {
+                    if stack_height == 2 {
+                        parent.inner_instructions.push(StructuredInstruction {
+                            account_key_indexes: inner_instruction.accounts.clone(),
+                            program_id_index: inner_instruction.program_id_index.clone() as u8,
+                            data: inner_instruction.data.clone(),
+                            inner_instructions: Vec::new(),
+                            stack_height: 2,
+                        });
+                    } else if stack_height == 3 {
+                        if let Some(last) = parent.inner_instructions.last_mut() {
+                            last.inner_instructions.push(StructuredInstruction {
+                                account_key_indexes: inner_instruction.accounts.clone(),
+                                program_id_index: inner_instruction.program_id_index.clone() as u8,
+                                data: inner_instruction.data.clone(),
+                                inner_instructions: Vec::new(),
+                                stack_height: 3,
+                            });
+                        }
+                    } else if stack_height == 4 {
+                        if let Some(last) = parent.inner_instructions.last_mut() {
+                            if let Some(last_last) = last.inner_instructions.last_mut() {
+                                last_last.inner_instructions.push(StructuredInstruction {
+                                    account_key_indexes: inner_instruction.accounts.clone(),
+                                    program_id_index: inner_instruction.program_id_index.clone()
+                                        as u8,
+                                    data: inner_instruction.data.clone(),
+                                    inner_instructions: Vec::new(),
+                                    stack_height: 4,
+                                });
+                            }
+                        }
+                    } else if stack_height == 5 {
+                        if let Some(last) = parent.inner_instructions.last_mut() {
+                            if let Some(last_last) = last.inner_instructions.last_mut() {
+                                if let Some(last_last_last) =
+                                    last_last.inner_instructions.last_mut()
+                                {
+                                    last_last_last
+                                        .inner_instructions
+                                        .push(StructuredInstruction {
+                                            account_key_indexes: inner_instruction.accounts.clone(),
+                                            program_id_index: inner_instruction
+                                                .program_id_index
+                                                .clone()
+                                                as u8,
+                                            data: inner_instruction.data.clone(),
+                                            inner_instructions: Vec::new(),
+                                            stack_height: 5,
+                                        });
+                                }
+                            }
+                        }
+                    }
+                }
+                None => {
+                    panic!("Stack height is None");
+                }
+            }
+        }
+        formatted.push(parent);
+        /*
         // Working tree of depth-0 children
-        let mut tree: Vec<InnerInstruction> = Vec::new();
+        let mut tree: Vec<StructuredInstruction> = Vec::new();
         // Stack to track most recent instruction at each depth
-        let mut stack: Vec<Option<InnerInstruction>> = Vec::new();
+        let mut stack: Vec<Option<StructuredInstruction>> = Vec::new();
         // Track promoted instructions to avoid duplicates
         let mut promoted: HashSet<usize> = HashSet::new(); // Using index instead of the struct
 
-        for (_, inner_instruction) in
-            inner_instruction_group.instructions.iter().enumerate()
-        {
+        for (_, inner_instruction) in inner_instruction_group.instructions.iter().enumerate() {
             let depth: usize = inner_instruction
                 .stack_height
                 .unwrap_or(0)
@@ -134,8 +204,8 @@ pub fn structure_all_instructions(transaction: &SubscribeUpdateTransaction) -> V
         // Attach the assembled tree to parent
         parent.inner_instructions = tree;
         formatted.push(parent);
+        */
     }
-
     formatted
 }
 
@@ -151,15 +221,6 @@ pub fn filter_instructions(
             structured_instructions.iter().for_each(|instruction| {
                 if instruction.program_id_index as usize == index {
                     return_ixs.push(instruction.clone());
-                } else {
-                    instruction
-                        .inner_instructions
-                        .iter()
-                        .for_each(|inner_instruction| {
-                            if inner_instruction.program_id_index as usize == index {
-                                return_ixs.push(instruction.clone());
-                            }
-                        })
                 }
             });
             return_ixs
@@ -169,16 +230,37 @@ pub fn filter_instructions(
 }
 
 pub fn filter_instructions_new(
-    structured_instructions: &Vec<StructuredInstruction>,
-    account_keys: &Vec<String>,
-    program_ids: HashSet<String>,
+    roots: &[StructuredInstruction],          // &[T] is idiomatic read-only
+    account_keys: &[String],
+    program_ids: &HashSet<String>,
 ) -> HashMap<String, Vec<StructuredInstruction>> {
-    let mut ret: HashMap<String, Vec<StructuredInstruction>> = HashMap::new();
-    for instruction in structured_instructions {
-        let program_id = &account_keys[instruction.program_id_index as usize];
-        if program_ids.contains(program_id) {
-            ret.entry(program_id.into()).or_default().push(instruction.clone());
+    let mut out: HashMap<String, Vec<StructuredInstruction>> = HashMap::new();
+
+    // depth-first walk
+    fn walk(
+        ix: &StructuredInstruction,
+        account_keys: &[String],
+        program_ids: &HashSet<String>,
+        out: &mut HashMap<String, Vec<StructuredInstruction>>,
+    ) {
+        // 1. resolve program-ID
+        let pid = &account_keys[ix.program_id_index as usize];
+
+        // 2. keep if caller asked for it
+        if program_ids.contains(pid) {
+            out.entry(pid.clone()).or_default().push(ix.clone());
+        }
+
+        // 3. recurse into children (no depth limit)
+        for child in &ix.inner_instructions {
+            walk(child, account_keys, program_ids, out);
         }
     }
-    ret
+
+    // kick off the walk for each root instruction
+    for ix in roots {
+        walk(ix, account_keys, program_ids, &mut out);
+    }
+
+    out
 }
