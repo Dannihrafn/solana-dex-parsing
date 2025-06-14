@@ -24,7 +24,6 @@ type TxnFilterMap = HashMap<String, SubscribeRequestFilterTransactions>;
 const PUMP_AMM_PROGRAM_ID: &str = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
 const PUMP_FUN_PROGRAM_ID: &str = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
 const RAYDIUM_PROGRAM_ID: &str = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
-const ADDRESS_TO_STREAM: &str = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
 
 #[derive(Debug, Clone, ClapParser)]
 #[clap(author, version, about)]
@@ -226,7 +225,6 @@ async fn geyser_subscribe(
                             slot,
                             timestamp,
                         );
-                        let raw_transaction = txn.clone().transaction.expect("transaction empty");
                         let decoded_txn = parser.decode_transaction(&upd_clone);
                         if decoded_txn.is_empty() {
                             if has_balance_change(&upd_clone) {
@@ -236,11 +234,6 @@ async fn geyser_subscribe(
                                 );
                             }
                         }
-                        let raw_message = raw_transaction.message.expect("message empty").clone();
-                        let _header = raw_message.header.expect("header empty");
-                        let _meta = txn.meta.expect("Meta empty");
-
-                        // You can continue processing from here if needed later
                     }
                     Some(UpdateOneof::Ping(_)) => {
                         subscribe_tx
