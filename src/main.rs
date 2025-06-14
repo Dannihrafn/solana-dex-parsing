@@ -226,14 +226,15 @@ async fn geyser_subscribe(
                             slot,
                             timestamp,
                         );
-
                         let raw_transaction = txn.clone().transaction.expect("transaction empty");
                         let decoded_txn = parser.decode_transaction(&upd_clone);
-                        if decoded_txn.is_empty() && has_balance_change(&upd_clone) {
-                            println!(
-                                "https://solscan.io/tx/{}",
-                                bs58::encode(&raw_signature).into_string()
-                            );
+                        if decoded_txn.is_empty() {
+                            if has_balance_change(&upd_clone) {
+                                println!(
+                                    "https://solscan.io/tx/{}",
+                                    bs58::encode(&raw_signature).into_string()
+                                );
+                            }
                         }
                         let raw_message = raw_transaction.message.expect("message empty").clone();
                         let _header = raw_message.header.expect("header empty");
@@ -284,10 +285,10 @@ pub fn has_balance_change(transaction: &SubscribeUpdateTransaction) -> bool {
     let mut has_balance_c = false;
     for balance in pre_token_balances.clone() {
         let mint = balance.mint;
-        let owner = balance.owner;
+        let owner = balance.account_index;
         let post_balance = post_token_balances
             .iter()
-            .find(|post_balance| post_balance.mint == mint && post_balance.owner == owner);
+            .find(|post_balance| post_balance.mint == mint && post_balance.account_index == owner);
         match post_balance {
             Some(post_balance) => {
                 let pre_amount = balance.ui_token_amount.unwrap().ui_amount;
@@ -301,10 +302,10 @@ pub fn has_balance_change(transaction: &SubscribeUpdateTransaction) -> bool {
     }
     for balance in post_token_balances {
         let mint = balance.mint;
-        let owner = balance.owner;
+        let owner = balance.account_index;
         let pre_balance = pre_token_balances
             .iter()
-            .find(|pre_balance| pre_balance.mint == mint && pre_balance.owner == owner);
+            .find(|pre_balance| pre_balance.mint == mint && pre_balance.account_index == owner);
         match pre_balance {
             Some(pre_balance) => {
                 let post_amount = balance.ui_token_amount.unwrap().ui_amount;
