@@ -4,7 +4,7 @@ use parser_pumpfun::PumpFunInstructionParser;
 use std::collections::{HashMap, HashSet};
 use types::{DecodedEvent, StructuredInstruction};
 use utils::{
-    filter_instructions_new, get_account_keys, get_filtered_instructions,
+    filter_instructions, get_account_keys,
     structure_all_instructions,
 };
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
@@ -39,12 +39,12 @@ impl InstructionParser for ParserEnum {
     }
 }
 #[derive(Clone, Debug)]
-pub struct TransactionParserNew {
+pub struct TransactionParser {
     parsers: HashMap<String, ParserEnum>,
     program_ids: HashSet<String>,
 }
 
-impl TransactionParserNew {
+impl TransactionParser {
     pub fn new() -> Self {
         let mut parsers: HashMap<String, ParserEnum> = HashMap::new();
         let mut program_ids: HashSet<String> = HashSet::new();
@@ -76,7 +76,7 @@ impl TransactionParserNew {
         account_keys: &Vec<String>,
     ) -> HashMap<String, Vec<StructuredInstruction>> {
         let structured_instructions = structure_all_instructions(tx);
-        filter_instructions_new(
+        filter_instructions(
             &structured_instructions,
             &account_keys,
             &self.program_ids.clone(),
@@ -97,65 +97,4 @@ impl TransactionParserNew {
         });
         ret
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct TransactionParser {
-    parsers: HashMap<String, ParserEnum>,
-}
-
-impl TransactionParser {
-    pub fn new() -> Self {
-        let mut parsers: HashMap<String, ParserEnum> = HashMap::new();
-
-        let pump_amm_parser = ParserEnum::PumpAmm(PumpAmmInstructionParser::new());
-        let pump_fun_parser = ParserEnum::PumpFun(PumpFunInstructionParser::new());
-
-        parsers.insert(
-            pump_amm_parser.get_program_id().to_string(),
-            pump_amm_parser.clone(),
-        );
-        parsers.insert(
-            pump_fun_parser.get_program_id().to_string(),
-            pump_fun_parser.clone(),
-        );
-
-        Self { parsers }
-    }
-
-    fn get_parsers(&self, tx: &SubscribeUpdateTransaction) -> Vec<&ParserEnum> {
-        let account_keys = get_account_keys(tx);
-        let mut unique_parsers: HashSet<*const ParserEnum> = HashSet::new();
-        let mut parsers: Vec<&ParserEnum> = Vec::new();
-
-        for key in account_keys {
-            if let Some(parser) = self.parsers.get(&key) {
-                let parser_ptr = parser as *const ParserEnum;
-                if unique_parsers.insert(parser_ptr) {
-                    parsers.push(parser);
-                }
-            }
-        }
-
-        parsers
-    }
-
-    pub fn decode_transaction(&self, tx: &SubscribeUpdateTransaction) -> Vec<DecodedEvent> {
-        let parsers = self.get_parsers(tx);
-        let mut decoded_instructions = Vec::new();
-
-        for parser in parsers.clone() {
-            let account_keys = get_account_keys(tx);
-            let instructions =
-                get_filtered_instructions(tx, &account_keys, parser.get_program_id());
-            let mut results = parser.decode_instructions(instructions.clone(), &account_keys);
-            decoded_instructions.append(&mut results);
-        }
-        decoded_instructions
-    }
-}
-
-pub trait TransactionParser_ {
-    fn parse_transaction(&self, transaction: SubscribeUpdateTransaction) -> Vec<DecodedEvent>;
-    fn get_program_id(&self) -> String;
 }

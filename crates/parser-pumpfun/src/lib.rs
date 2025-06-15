@@ -4,8 +4,6 @@ use types::{
     DecodedEvent, DecodedPumpFunCreatePoolEvent, DecodedPumpFunEvent, DecodedPumpFunSwapEvent,
     DecodedPumpFunSwapLog, StructuredInstruction, SwapEventAccounts, TransactionType,
 };
-use utils::{get_account_keys, get_filtered_instructions};
-use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
 #[derive(Clone, Debug)]
 pub struct PumpFunInstructionParser {}
@@ -42,23 +40,6 @@ impl PumpFunInstructionParser {
     const POOL_CREATION_DISCRIMINATOR: [u8; 8] = [24, 30, 200, 40, 5, 28, 7, 119];
     const BUY_DISCRIMINATOR: [u8; 8] = [102, 6, 61, 18, 1, 218, 235, 234];
     const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
-
-    pub fn decode_transaction(
-        &self,
-        transaction: &SubscribeUpdateTransaction,
-    ) -> Vec<DecodedPumpFunEvent> {
-        let account_keys: Vec<String> = get_account_keys(transaction);
-        let ixs: Vec<StructuredInstruction> =
-            get_filtered_instructions(transaction, &account_keys, self.get_program_id());
-        if ixs.is_empty() {
-            return Vec::new();
-        }
-        let decoded_instructions: Vec<DecodedPumpFunEvent> = ixs
-            .iter()
-            .filter_map(|instruction| self.decode_instruction(instruction, &account_keys))
-            .collect();
-        decoded_instructions
-    }
 
     pub fn decode_instruction(
         &self,

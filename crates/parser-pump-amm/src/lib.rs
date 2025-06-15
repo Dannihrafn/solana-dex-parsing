@@ -1,8 +1,6 @@
 use bs58;
 use instruction_parser::InstructionParser;
-use types::{DecodedEvent, DecodedPumpAmmBuyLog, DecodedPumpAmmCreatePoolEvent, DecodedPumpAmmEvent, DecodedPumpAmmSellLog, DecodedPumpAmmSwapEvent, PumpAmmTransaction, StructuredInstruction, SwapEventAccounts, TransactionType, DecodedPumpAmmDepositEvent, DecodedPumpAmmWithdrawEvent, PumpAmmWithdrawEvent};
-use utils::{get_account_keys, get_filtered_instructions};
-use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
+use types::{DecodedEvent, DecodedPumpAmmBuyLog, DecodedPumpAmmCreatePoolEvent, DecodedPumpAmmEvent, DecodedPumpAmmSellLog, DecodedPumpAmmSwapEvent, StructuredInstruction, SwapEventAccounts, TransactionType, DecodedPumpAmmDepositEvent, DecodedPumpAmmWithdrawEvent};
 
 #[derive(Clone, Debug)]
 pub struct PumpAmmInstructionParser {}
@@ -44,28 +42,6 @@ impl PumpAmmInstructionParser {
     const SELL_DISCRIMINATOR: [u8; 8] = [51, 230, 133, 164, 1, 127, 131, 173];
     const DEPOSIT_DISCRIMINATOR: [u8; 8] = [242, 35, 198, 137, 82, 225, 242, 182];
     const WITHDRAW_DISCRIMINATOR: [u8; 8] = [183, 18, 70, 156, 148, 109, 161, 34];
-
-    pub fn decode_transaction(
-        &self,
-        transaction: &SubscribeUpdateTransaction,
-    ) -> Vec<DecodedEvent> {
-        let account_keys: Vec<String> = get_account_keys(transaction);
-        let ixs: Vec<StructuredInstruction> =
-            get_filtered_instructions(transaction, &account_keys, self.get_program_id());
-        if ixs.is_empty() {
-            return Vec::new();
-        }
-        let decoded_instructions: Vec<DecodedEvent> = ixs
-            .iter()
-            .filter_map(
-                |instruction| match self.decode_instruction(instruction, &account_keys) {
-                    Some(decoded_instruction) => Some(DecodedEvent::PumpAmm(decoded_instruction)),
-                    None => None,
-                },
-            )
-            .collect();
-        decoded_instructions
-    }
 
     pub fn decode_instruction(
         &self,

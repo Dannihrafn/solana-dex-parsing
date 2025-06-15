@@ -3,7 +3,7 @@ use {
     clap::Parser as ClapParser,
     futures::{future::TryFutureExt, sink::SinkExt, stream::StreamExt},
     log::{error, info},
-    parser_core::TransactionParserNew,
+    parser_core::TransactionParser,
     serde::{Deserialize, Serialize},
     serde_json,
     std::{collections::HashMap, env, sync::Arc, time::Duration},
@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
         attempts_since_success: 0,
     }));
 
-    let parser = TransactionParserNew::new();
+    let parser = TransactionParser::new();
 
     // The default exponential backoff strategy intervals:
     // [500ms, 750ms, 1.125s, 1.6875s, 2.53125s, 3.796875s, 5.6953125s,
@@ -175,7 +175,7 @@ async fn geyser_subscribe(
     mut client: GeyserGrpcClient<impl Interceptor>,
     request: SubscribeRequest,
     state: Arc<Mutex<State>>,
-    parser: TransactionParserNew,
+    parser: TransactionParser,
 ) -> anyhow::Result<()> {
     let (mut subscribe_tx, mut stream) = client.subscribe_with_request(Some(request)).await?;
 

@@ -17,24 +17,6 @@ pub fn get_account_keys(transaction: &SubscribeUpdateTransaction) -> Vec<String>
         .collect()
 }
 
-pub fn get_filtered_instructions(
-    transaction: &SubscribeUpdateTransaction,
-    account_keys: &Vec<String>,
-    program_id: &str,
-) -> Vec<StructuredInstruction> {
-    let program_index = account_keys.iter().position(|key| *key == *program_id);
-    match program_index {
-        Some(_) => {}
-        None => {
-            panic!("Program index could not be found");
-        }
-    }
-    let structured_instructions = structure_all_instructions(&transaction);
-    let filtered_instructions =
-        filter_instructions(&structured_instructions, account_keys, program_id);
-    filtered_instructions
-}
-
 pub fn structure_all_instructions(
     transaction: &SubscribeUpdateTransaction,
 ) -> Vec<StructuredInstruction> {
@@ -142,26 +124,6 @@ pub fn structure_all_instructions(
 }
 
 pub fn filter_instructions(
-    structured_instructions: &Vec<StructuredInstruction>,
-    account_keys: &Vec<String>,
-    program_id: &str,
-) -> Vec<StructuredInstruction> {
-    let program_index = account_keys.iter().position(|key| *key == *program_id);
-    match program_index {
-        Some(index) => {
-            let mut return_ixs: Vec<StructuredInstruction> = Vec::new();
-            structured_instructions.iter().for_each(|instruction| {
-                if instruction.program_id_index as usize == index {
-                    return_ixs.push(instruction.clone());
-                }
-            });
-            return_ixs
-        }
-        None => panic!("Program index could not be found"),
-    }
-}
-
-pub fn filter_instructions_new(
     roots: &[StructuredInstruction],          // &[T] is idiomatic read-only
     account_keys: &[String],
     program_ids: &HashSet<String>,
