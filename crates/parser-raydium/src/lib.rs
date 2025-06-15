@@ -1,8 +1,7 @@
 use bs58;
 use instruction_parser::InstructionParser;
 use types::{
-    DecodedEvent, DecodedPumpFunCreatePoolEvent, DecodedPumpFunEvent, DecodedPumpFunSwapEvent,
-    DecodedPumpFunSwapLog, StructuredInstruction, SwapEventAccounts, TransactionType, DecodedRaydiumSwapEvent
+    DecodedEvent, StructuredInstruction, DecodedRaydiumSwapEvent, DecodedRaydiumCreatePoolEvent, DecodedRaydiumEvent
 };
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 use utils::parse_token_program_transfer;
@@ -28,8 +27,8 @@ impl InstructionParser for RaydiumInstructionParser {
         instructions
             .iter()
             .filter_map(
-                |instruction| match self.decode_instruction(instruction, &account_keys) {
-                    Some(decoded_instruction) => Some(DecodedEvent::PumpFun(decoded_instruction)),
+                |instruction| match self.decode_instruction(instruction, &account_keys, transaction) {
+                    Some(decoded_instruction) => Some(DecodedEvent::Raydium(decoded_instruction)),
                     None => None,
                 },
             )
@@ -39,6 +38,7 @@ impl InstructionParser for RaydiumInstructionParser {
 
 impl RaydiumInstructionParser {
     const PROGRAM_ID: &'static str = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8";
+    const TOKEN_PROGRAM_ID: &'static str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
     const WSOL_ADDRESS: &'static str = "So11111111111111111111111111111111111111112";
     const POOL_CREATION_DISCRIMINATOR: [u8; 1] = [1];
     const SWAP_BASE_IN_DISCRIMINATOR: [u8; 1] = [9];
@@ -47,173 +47,46 @@ impl RaydiumInstructionParser {
         &self,
         instruction: &StructuredInstruction,
         account_keys: &Vec<String>,
-    ) -> Option<DecodedPumpFunEvent> {
+        transaction: &SubscribeUpdateTransaction,
+    ) -> Option<DecodedRaydiumEvent> {
         let discriminator = &instruction.data[0..1];
         if discriminator == Self::SWAP_BASE_IN_DISCRIMINATOR {
-            return Some(DecodedPumpFunEvent::Swap(Self::decode_buy_event(
-                instruction,
+            return Some(DecodedRaydiumEvent::Swap(Self::decode_swap_base_in(
+                instruction, account_keys, transaction
             )));
         } else if discriminator == Self::POOL_CREATION_DISCRIMINATOR {
-            return Some(DecodedPumpFunEvent::CreatePool(
+            return Some(DecodedRaydiumEvent::CreatePool(
                 Self::decode_pool_creation_event(instruction, account_keys),
             ));
         }
         None
     }
 
-    pub fn decode_buy_event(instruction: &StructuredInstruction) -> DecodedPumpFunSwapEvent {
-        let last_ix = instruction.inner_instructions.last().unwrap();
-        let buy_log = if last_ix.data.len() < 233 {
-            instruction
-                .inner_instructions
-                .get(instruction.inner_instructions.len().wrapping_sub(2))
-                .unwrap()
-        } else {
-            last_ix
-        };
-        let decoded_buy_log = Self::decode_buy_log(&buy_log.data);
-
-        DecodedPumpFunSwapEvent {
-            accounts: SwapEventAccounts {
-                pool: decoded_buy_log.mint.clone(),
-                user: decoded_buy_log.user.clone(),
-                base_mint: decoded_buy_log.mint.clone(),
-                quote_mint: Self::WSOL_ADDRESS.to_string(),
-            },
-            mint_in: Self::WSOL_ADDRESS.to_string(),
-            mint_out: decoded_buy_log.mint.clone(),
-            amount_in: decoded_buy_log.sol_amount,
-            amount_out: decoded_buy_log.token_amount,
-            mint_in_reserve: decoded_buy_log.virtual_sol_reserves,
-            mint_out_reserve: decoded_buy_log.virtual_token_reserves,
-            event_type: TransactionType::Buy,
-        }
-    }
-
-    pub fn decode_buy_log(data: &[u8]) -> DecodedPumpFunSwapLog {
-        let mut offset: usize = 16;
-        let mint: String = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
-        offset += 32;
-        let sol_amount = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-        offset += 8;
-        let token_amount = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-        offset += 9;
-        let user = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
-        offset += 40;
-        let virtual_sol_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-        offset += 8;
-        let virtual_token_reserves =
-            u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-
-        DecodedPumpFunSwapLog {
-            mint,
-            sol_amount,
-            token_amount,
-            user,
-            virtual_sol_reserves,
-            virtual_token_reserves,
-        }
-    }
-
-    pub fn decode_sell_event(instruction: &StructuredInstruction) -> DecodedPumpFunSwapEvent {
-        let inner_instructions = &instruction.inner_instructions;
-        let last_ix = &inner_instructions.last().unwrap();
-        let sell_log = if last_ix.data.len() < 233 {
-            inner_instructions
-                .get(inner_instructions.len().wrapping_sub(2))
-                .unwrap()
-        } else {
-            last_ix
-        };
-        let decoded_sell_log = Self::decode_sell_log(&sell_log.data);
-
-        DecodedPumpFunSwapEvent {
-            accounts: SwapEventAccounts {
-                pool: decoded_sell_log.mint.clone(),
-                user: decoded_sell_log.user.clone(),
-                base_mint: decoded_sell_log.mint.clone(),
-                quote_mint: Self::WSOL_ADDRESS.to_string(),
-            },
-            mint_in: decoded_sell_log.mint.clone(),
-            mint_out: Self::WSOL_ADDRESS.to_string(),
-            amount_in: decoded_sell_log.token_amount,
-            amount_out: decoded_sell_log.sol_amount,
-            mint_in_reserve: decoded_sell_log.virtual_token_reserves,
-            mint_out_reserve: decoded_sell_log.virtual_sol_reserves,
-            event_type: TransactionType::Sell,
-        }
-    }
-
-    fn decode_sell_log(data: &[u8]) -> DecodedPumpFunSwapLog {
-        let mut offset: usize = 16;
-        let mint: String = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
-        offset += 32;
-        let sol_amount = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-        offset += 8;
-        let token_amount = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-        offset += 9;
-        let user = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
-        offset += 40;
-        let virtual_sol_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-        offset += 8;
-        let virtual_token_reserves =
-            u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
-
-        DecodedPumpFunSwapLog {
-            mint,
-            sol_amount,
-            token_amount,
-            user,
-            virtual_sol_reserves,
-            virtual_token_reserves,
-        }
-    }
-
     pub fn decode_pool_creation_event(
         instruction: &StructuredInstruction,
         account_keys: &[String],
-    ) -> DecodedPumpFunCreatePoolEvent {
-        let account_key_indexes: &Vec<u8> = &instruction.account_key_indexes;
-        let data: &Vec<u8> = &instruction.data;
-        if data.len() < 8 {
-            println!("instruction: {:?}", instruction)
-        }
-        let mut offset = 8;
-        let name_length = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
-        if name_length > 100 {
-            println!("{:?}", data);
-        }
-        offset += 4;
-        let name = String::from_utf8(data[offset..offset + name_length as usize].to_vec()).unwrap();
-        offset += name_length as usize;
-        let symbol_length = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
-        offset += 4;
-        let symbol = String::from_utf8(data[offset..offset + symbol_length as usize].to_vec()).unwrap();
-        offset += symbol_length as usize;
-        let uri_length = u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap());
-        offset += 4;
-        let uri = String::from_utf8(data[offset..offset + uri_length as usize].to_vec()).unwrap();
-        offset += uri_length as usize;
-        let coin_creator = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
+    ) -> DecodedRaydiumCreatePoolEvent {
+        let account_key_indexes = &instruction.account_key_indexes;
+        let inner_instructions = &instruction.inner_instructions;
+        let token_program_index = account_keys.iter().position(|key| key == Self::TOKEN_PROGRAM_ID).unwrap();
+        let token_program_transactions: Vec<&StructuredInstruction> = inner_instructions.iter().filter(|instruction| instruction.program_id_index == token_program_index as u8).collect();
+        let base_mint_transfer = parse_token_program_transfer(token_program_transactions[0], &account_keys.to_vec());
+        let quote_mint_transfer =  parse_token_program_transfer(token_program_transactions[1], &account_keys.to_vec());
 
-        let mint =
-            bs58::encode(account_keys[account_key_indexes[0] as usize].clone()).into_string();
-        let bonding_curve =
-            bs58::encode(account_keys[account_key_indexes[2] as usize].clone()).into_string();
-        let associated_bonding_curve =
-            bs58::encode(account_keys[account_key_indexes[3] as usize].clone()).into_string();
+        let user = account_keys[account_key_indexes[0] as usize].clone();
+        let pool = account_keys[account_key_indexes[4] as usize].clone();
+        let base_mint = account_keys[account_key_indexes[8] as usize].clone();
+        let quote_mint = account_keys[account_key_indexes[9] as usize].clone();
 
-        DecodedPumpFunCreatePoolEvent {
-            name,
-            symbol,
-            uri,
-            creator: coin_creator,
-            base_mint: mint,
-            quote_mint: Self::WSOL_ADDRESS.to_string(),
-            bonding_curve,
-            associated_bonding_curve,
-            event_type: TransactionType::CreatePool,
+        DecodedRaydiumCreatePoolEvent {
+            pool,
+            user,
+            base_mint,
+            quote_mint,
+            base_amount: base_mint_transfer.amount,
+            quote_amount: quote_mint_transfer.amount,
         }
+
     }
 
     pub fn decode_swap_base_in(instruction: &StructuredInstruction, account_keys: &Vec<String>, transaction: &SubscribeUpdateTransaction) -> DecodedRaydiumSwapEvent {
