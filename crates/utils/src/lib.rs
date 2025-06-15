@@ -1,6 +1,6 @@
 use bs58;
 use std::collections::{HashMap, HashSet};
-use types::{StructuredInstruction};
+use types::{StructuredInstruction, TokenProgramTransfer};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
 pub fn get_account_keys(transaction: &SubscribeUpdateTransaction) -> Vec<String> {
@@ -157,4 +157,18 @@ pub fn filter_instructions(
     }
 
     out
+}
+
+pub fn parse_token_program_transfer(instruction: &StructuredInstruction, account_keys: &Vec<String>) -> TokenProgramTransfer {
+    let accounts = &instruction.account_key_indexes;
+    let source = account_keys[accounts[0] as usize].clone();
+    let destination = account_keys[accounts[1] as usize].clone();
+    let authority = account_keys[accounts[2] as usize].clone();
+    let amount = u64::from_le_bytes(instruction.data[1..10].try_into().unwrap());
+    TokenProgramTransfer {
+        source,
+        destination,
+        authority,
+        amount
+    }
 }

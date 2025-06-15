@@ -31,10 +31,11 @@ impl InstructionParser for ParserEnum {
         &self,
         instructions: Vec<StructuredInstruction>,
         account_keys: &Vec<String>,
+        transaction: &SubscribeUpdateTransaction,
     ) -> Vec<DecodedEvent> {
         match self {
-            ParserEnum::PumpAmm(p) => p.decode_instructions(instructions, account_keys),
-            ParserEnum::PumpFun(p) => p.decode_instructions(instructions, account_keys),
+            ParserEnum::PumpAmm(p) => p.decode_instructions(instructions, account_keys, transaction),
+            ParserEnum::PumpFun(p) => p.decode_instructions(instructions, account_keys, transaction),
         }
     }
 }
@@ -91,7 +92,7 @@ impl TransactionParser {
         keys.iter().for_each(|key| {
             if let Some(parser) = self.parsers.get(key) {
                 let mut results = parser
-                    .decode_instructions(ids_and_ixs.get(key).unwrap().clone(), &account_keys);
+                    .decode_instructions(ids_and_ixs.get(key).unwrap().clone(), &account_keys, tx);
                 ret.append(&mut results);
             }
         });

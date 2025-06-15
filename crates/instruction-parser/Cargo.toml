@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 types = { workspace = true }
+yellowstone-grpc-proto = { version = "4.0.0", default-features = false, features = ["plugin"] }

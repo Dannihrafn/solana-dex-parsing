@@ -4,7 +4,7 @@ use types::{
     DecodedEvent, DecodedPumpFunCreatePoolEvent, DecodedPumpFunEvent, DecodedPumpFunSwapEvent,
     DecodedPumpFunSwapLog, StructuredInstruction, SwapEventAccounts, TransactionType,
 };
-
+use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 #[derive(Clone, Debug)]
 pub struct PumpFunInstructionParser {}
 
@@ -21,6 +21,7 @@ impl InstructionParser for PumpFunInstructionParser {
         &self,
         instructions: Vec<StructuredInstruction>,
         account_keys: &Vec<String>,
+        transaction: &SubscribeUpdateTransaction,
     ) -> Vec<DecodedEvent> {
         instructions
             .iter()

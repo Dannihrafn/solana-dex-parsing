@@ -1,7 +1,7 @@
 use bs58;
 use instruction_parser::InstructionParser;
 use types::{DecodedEvent, DecodedPumpAmmBuyLog, DecodedPumpAmmCreatePoolEvent, DecodedPumpAmmEvent, DecodedPumpAmmSellLog, DecodedPumpAmmSwapEvent, StructuredInstruction, SwapEventAccounts, TransactionType, DecodedPumpAmmDepositEvent, DecodedPumpAmmWithdrawEvent};
-
+use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 #[derive(Clone, Debug)]
 pub struct PumpAmmInstructionParser {}
 
@@ -18,6 +18,7 @@ impl InstructionParser for PumpAmmInstructionParser {
         &self,
         instructions: Vec<StructuredInstruction>,
         account_keys: &Vec<String>,
+        transaction: &SubscribeUpdateTransaction
     ) -> Vec<DecodedEvent> {
         let ixs: Vec<DecodedEvent> = instructions
             .iter()

@@ -368,6 +368,12 @@ pub enum DecodedPumpAmmEvent {
 }
 
 #[derive(Debug)]
+pub enum DecodedRaydiumEvent {
+    Swap(DecodedRaydiumSwapEvent),
+    CreatePool(DecodedRaydiumCreatePoolEvent)
+}
+
+#[derive(Debug)]
 pub struct SwapEventAccounts {
     pub pool: String,
     pub user: String,
@@ -420,7 +426,8 @@ pub struct DecodedPumpFunSwapEvent {
 #[derive(Debug)]
 pub enum DecodedEvent {
     PumpAmm(DecodedPumpAmmEvent),
-    PumpFun(DecodedPumpFunEvent)
+    PumpFun(DecodedPumpFunEvent),
+    Raydium(DecodedRaydiumEvent),
 }
 
 #[derive(Debug)]
@@ -431,4 +438,36 @@ pub struct DecodedPumpFunSwapLog {
     pub user: String,
     pub virtual_sol_reserves: u64,
     pub virtual_token_reserves: u64,
+}
+
+#[derive(Debug)]
+pub struct TokenProgramTransfer {
+    pub source: String,
+    pub destination: String,
+    pub authority: String,
+    pub amount: u64,
+}
+
+#[derive(Debug)]
+pub struct DecodedRaydiumSwapEvent {
+    pub pool: String,
+    pub user: String,
+    pub mint_in: String,
+    pub mint_out: String,
+    pub in_decimals: u8,
+    pub out_decimals: u8,
+    pub mint_in_reserve: u64,
+    pub mint_out_reserve: u64,
+    pub amount_in: u64,
+    pub amount_out: u64,
+}
+
+#[derive(Debug)]
+pub struct DecodedRaydiumCreatePoolEvent {
+    pub pool: String,
+    pub user: String,
+    pub base_mint: String,
+    pub quote_mint: String,
+    pub base_amount: u64,
+    pub quote_amount: u64
 }
