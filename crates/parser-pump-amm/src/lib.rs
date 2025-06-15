@@ -1,10 +1,6 @@
 use bs58;
 use instruction_parser::InstructionParser;
-use types::{
-    DecodedEvent, DecodedPumpAmmBuyLog, DecodedPumpAmmCreatePoolEvent, DecodedPumpAmmEvent,
-    DecodedPumpAmmSellLog, DecodedPumpAmmSwapEvent, PumpAmmTransaction, StructuredInstruction,
-    SwapEventAccounts, TransactionType,
-};
+use types::{DecodedEvent, DecodedPumpAmmBuyLog, DecodedPumpAmmCreatePoolEvent, DecodedPumpAmmEvent, DecodedPumpAmmSellLog, DecodedPumpAmmSwapEvent, PumpAmmTransaction, StructuredInstruction, SwapEventAccounts, TransactionType, DecodedPumpAmmDepositEvent, DecodedPumpAmmWithdrawEvent, PumpAmmWithdrawEvent};
 use utils::{get_account_keys, get_filtered_instructions};
 use yellowstone_grpc_proto::prelude::SubscribeUpdateTransaction;
 
@@ -91,11 +87,11 @@ impl PumpAmmInstructionParser {
             return Some(DecodedPumpAmmEvent::CreatePool(
                 Self::decode_pool_creation_event(instruction, account_keys),
             ));
-        } /*else if discriminator == Self::WITHDRAW_DISCRIMINATOR {
-        return Self::decode_withdraw_event(instruction, account_keys);
+        } else if discriminator == Self::WITHDRAW_DISCRIMINATOR {
+        return Some(DecodedPumpAmmEvent::Withdraw(Self::decode_withdraw_event(instruction)));
         } else if discriminator == Self::DEPOSIT_DISCRIMINATOR {
-        return Self::decode_deposit_event(instruction, account_keys);
-        }*/
+        return Some(DecodedPumpAmmEvent::Deposit(Self::decode_deposit_event(instruction)));
+        }
         None
     }
     pub fn decode_buy_event(
@@ -108,13 +104,6 @@ impl PumpAmmInstructionParser {
         let base_mint = account_keys[account_key_indexes[3] as usize].clone();
         let quote_mint = account_keys[account_key_indexes[4] as usize].clone();
         let buy_log = instruction.inner_instructions.last().unwrap();
-        if buy_log.data.len() < 352 {
-            println!("instruction: {:?}", instruction);
-            println!("-----------------------------------------------------------------");
-            println!("inner_instructions: {:?}", instruction.inner_instructions);
-            println!("-----------------------------------------------------------------");
-            println!("buy_log: {:?}", buy_log);
-        }
         let decoded_buy_log = Self::decode_buy_log(&buy_log.data).unwrap();
         let mint_in_reserve = decoded_buy_log.pool_base_token_reserves.clone();
         let mint_out_reserve = decoded_buy_log.pool_quote_token_reserves.clone();
@@ -138,7 +127,6 @@ impl PumpAmmInstructionParser {
 
     pub fn decode_buy_log(data: &[u8]) -> Option<DecodedPumpAmmBuyLog> {
         if data.len() < 352 {
-            println!("data: {:?}", data);
             return None;
         }
         let mut offset: usize = 24;
@@ -153,14 +141,14 @@ impl PumpAmmInstructionParser {
         let quote_amount_in: u64 = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
         offset += 248;
         let coin_creator: String = bs58::encode(data[offset..offset + 32].to_vec()).into_string();
-        return Some(DecodedPumpAmmBuyLog {
+        Some(DecodedPumpAmmBuyLog {
             quote_amount_in,
             base_amount_out,
             pool_base_token_reserves,
             pool_quote_token_reserves,
             coin_creator,
             transaction_type: TransactionType::Buy,
-        });
+        })
     }
 
     pub fn decode_sell_event(
@@ -256,15 +244,43 @@ impl PumpAmmInstructionParser {
 
     pub fn decode_withdraw_event(
         instruction: &StructuredInstruction,
-        account_keys: &Vec<String>,
-    ) -> Option<PumpAmmTransaction> {
-        todo!();
+    ) -> DecodedPumpAmmWithdrawEvent {
+        let data = &instruction.data;
+        let mut offset: usize = 64;
+        let pool_base_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let pool_quote_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let base_amount_out = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let quote_amount_out = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        
+        DecodedPumpAmmWithdrawEvent {
+            pool_base_token_reserves,
+            pool_quote_token_reserves,
+            base_amount_out,
+            quote_amount_out,
+        }
     }
 
     pub fn decode_deposit_event(
         instruction: &StructuredInstruction,
-        account_keys: &Vec<String>,
-    ) -> Option<PumpAmmTransaction> {
-        todo!();
+    ) -> DecodedPumpAmmDepositEvent {
+        let data = &instruction.data;
+        let mut offset: usize = 64;
+        let pool_base_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let pool_quote_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let base_amount_in = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+        offset += 8;
+        let quote_amount_in = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
+
+        DecodedPumpAmmDepositEvent {
+            pool_base_token_reserves,
+            pool_quote_token_reserves,
+            base_amount_in,
+            quote_amount_in,
+        }
     }
 }

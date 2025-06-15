@@ -320,6 +320,22 @@ pub struct DecodedPumpAmmSellLog {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct DecodedPumpAmmWithdrawEvent {
+    pub pool_base_token_reserves: u64,
+    pub pool_quote_token_reserves: u64,
+    pub base_amount_out: u64,
+    pub quote_amount_out: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DecodedPumpAmmDepositEvent {
+    pub pool_base_token_reserves: u64,
+    pub pool_quote_token_reserves: u64,
+    pub base_amount_in: u64,
+    pub quote_amount_in: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum TransactionType {
     Buy,
     Sell,
@@ -347,8 +363,8 @@ pub struct DecodedPumpAmmCreatePoolEvent {
 pub enum DecodedPumpAmmEvent {
     Swap(DecodedPumpAmmSwapEvent),
     CreatePool(DecodedPumpAmmCreatePoolEvent),
-    //Withdraw(DecodedWithdrawEvent),
-    //Deposit(DecodedDepositEvent),
+    Withdraw(DecodedPumpAmmWithdrawEvent),
+    Deposit(DecodedPumpAmmDepositEvent),
 }
 
 #[derive(Debug)]
@@ -388,8 +404,6 @@ pub struct DecodedPumpFunCreatePoolEvent {
 pub enum DecodedPumpFunEvent {
     Swap(DecodedPumpFunSwapEvent),
     CreatePool(DecodedPumpFunCreatePoolEvent),
-    //Withdraw(DecodedWithdrawEvent),
-    //Deposit(DecodedDepositEvent),
 }
 
 #[derive(Debug)]
