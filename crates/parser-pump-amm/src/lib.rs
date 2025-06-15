@@ -221,7 +221,8 @@ impl PumpAmmInstructionParser {
     pub fn decode_withdraw_event(
         instruction: &StructuredInstruction,
     ) -> DecodedPumpAmmWithdrawEvent {
-        let data = &instruction.data;
+        let correct_instruction = instruction.inner_instructions.last().unwrap().clone();
+        let data = correct_instruction.data;
         let mut offset: usize = 64;
         let pool_base_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
         offset += 8;
@@ -242,7 +243,8 @@ impl PumpAmmInstructionParser {
     pub fn decode_deposit_event(
         instruction: &StructuredInstruction,
     ) -> DecodedPumpAmmDepositEvent {
-        let data = &instruction.data;
+        let correct_instruction = instruction.inner_instructions.last().unwrap().clone();
+        let data = correct_instruction.data;
         let mut offset: usize = 64;
         let pool_base_token_reserves = u64::from_le_bytes(data[offset..offset + 8].try_into().unwrap());
         offset += 8;
